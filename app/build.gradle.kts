@@ -89,9 +89,8 @@ dependencies {
     // DataStore (settings: sheets URL, sync prefs)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // Charts (Compose-native)
-    implementation("com.patrykandpatrick.vico:compose:2.1.2")
-    implementation("com.patrykandpatrick.vico:compose-m3:2.1.2")
+    // (30-day chart is drawn with plain Compose Canvas - no external charting
+    // library needed, avoids version/API churn.)
 
     // Networking for Google Sheets (Apps Script webhook)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
