@@ -21,13 +21,13 @@
 
 const DEFS_SHEET_NAME = 'HabitDefinitions';
 const DEFS_COLUMNS = [
-  'syncId', 'name', 'emoji', 'colorHex', 'activeDays', 'timeOfDay',
+  'syncId', 'name', 'emoji', 'colorHex', 'category', 'activeDays', 'timeOfDay',
   'reminderEnabled', 'reminderHour', 'reminderMinute',
   'lawObvious', 'lawAttractive', 'lawEasy', 'lawSatisfying',
   'createdAtEpochDay', 'archived'
 ];
 const DEFS_HEADER_LABELS = [
-  'Sync ID', 'Name', 'Emoji', 'Color', 'Active Days (bitmask)', 'Time Of Day',
+  'Sync ID', 'Name', 'Emoji', 'Color', 'Category', 'Active Days (bitmask)', 'Time Of Day',
   'Reminder On', 'Reminder Hour', 'Reminder Minute',
   'Law: Obvious', 'Law: Attractive', 'Law: Easy', 'Law: Satisfying',
   'Created (epoch day)', 'Archived'

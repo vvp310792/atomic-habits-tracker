@@ -25,6 +25,10 @@ import androidx.room.PrimaryKey
  *
  * [timeOfDay] groups the habit into one of the Home screen's three sections:
  * "MORNING", "DAY", or "EVENING".
+ *
+ * [category] tags the habit with one of 7 fixed life areas (CAREER, INTELLECT,
+ * SELF_DEVELOPMENT, FINANCE, SOCIETY, HEALTH, FAMILY) - each has its own fixed
+ * color (see util/Categories.kt), which is what [colorHex] is derived from.
  */
 @Entity(tableName = "habits", indices = [Index(value = ["syncId"], unique = true)])
 data class Habit(
@@ -33,6 +37,7 @@ data class Habit(
     val name: String,
     val emoji: String = "\u2705",
     val colorHex: String = "#7C6CF0",
+    val category: String = "SELF_DEVELOPMENT",
     val activeDays: Int = 127,
     val timeOfDay: String = "MORNING",
     val reminderEnabled: Boolean = false,

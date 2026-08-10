@@ -81,8 +81,13 @@ fun HabitCard(
                 androidx.compose.foundation.layout.Spacer(Modifier.size(12.dp))
                 androidx.compose.foundation.layout.Column {
                     Text(habit.name, style = MaterialTheme.typography.bodyLarge)
-                    if (currentStreak > 0) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 2.dp)
+                    ) {
+                        CategoryTag(value = habit.category)
+                        if (currentStreak > 0) {
+                            androidx.compose.foundation.layout.Spacer(Modifier.size(6.dp))
                             Icon(
                                 Icons.Filled.LocalFireDepartment,
                                 contentDescription = null,

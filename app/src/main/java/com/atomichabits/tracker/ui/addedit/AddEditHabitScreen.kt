@@ -40,11 +40,12 @@ import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.Habit
 import com.atomichabits.tracker.notifications.ReminderScheduler
-import com.atomichabits.tracker.ui.components.ColorPicker
+import com.atomichabits.tracker.ui.components.CategoryPicker
 import com.atomichabits.tracker.ui.components.EmojiPicker
 import com.atomichabits.tracker.ui.components.LawSection
 import com.atomichabits.tracker.ui.components.WeekdayPicker
 import com.atomichabits.tracker.util.ALL_DAYS_MASK
+import com.atomichabits.tracker.util.categoryColorHex
 import com.atomichabits.tracker.util.TIME_OF_DAY_VALUES
 import com.atomichabits.tracker.util.timeOfDayLabel
 import kotlinx.coroutines.flow.first
@@ -65,7 +66,8 @@ fun AddEditHabitScreen(
     var syncId by remember { mutableStateOf(java.util.UUID.randomUUID().toString()) }
     var name by remember { mutableStateOf("") }
     var emoji by remember { mutableStateOf("\u2705") }
-    var colorHex by remember { mutableStateOf("#7C6CF0") }
+    var category by remember { mutableStateOf("SELF_DEVELOPMENT") }
+    var colorHex by remember { mutableStateOf(categoryColorHex("SELF_DEVELOPMENT")) }
     var activeDays by remember { mutableStateOf(ALL_DAYS_MASK) }
     var timeOfDay by remember { mutableStateOf("MORNING") }
     var reminderEnabled by remember { mutableStateOf(false) }
@@ -86,6 +88,7 @@ fun AddEditHabitScreen(
                 syncId = h.syncId
                 name = h.name
                 emoji = h.emoji
+                category = h.category
                 colorHex = h.colorHex
                 activeDays = h.activeDays
                 timeOfDay = h.timeOfDay
@@ -107,6 +110,7 @@ fun AddEditHabitScreen(
         name = name.trim(),
         emoji = emoji,
         colorHex = colorHex,
+        category = category,
         activeDays = activeDays,
         timeOfDay = timeOfDay,
         reminderEnabled = reminderEnabled,
@@ -158,8 +162,14 @@ fun AddEditHabitScreen(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.field_color), style = MaterialTheme.typography.labelLarge)
-                ColorPicker(selectedHex = colorHex, onSelect = { colorHex = it })
+                Text(stringResource(R.string.field_category), style = MaterialTheme.typography.labelLarge)
+                CategoryPicker(
+                    selected = category,
+                    onSelect = { value ->
+                        category = value
+                        colorHex = categoryColorHex(value)
+                    }
+                )
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

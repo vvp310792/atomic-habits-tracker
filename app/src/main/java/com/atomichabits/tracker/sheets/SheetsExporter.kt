@@ -18,6 +18,7 @@ data class RemoteHabit(
     val name: String,
     val emoji: String,
     val colorHex: String,
+    val category: String,
     val activeDays: Int,
     val timeOfDay: String,
     val reminderEnabled: Boolean,
@@ -70,6 +71,7 @@ class SheetsExporter(private val webAppUrl: String) {
                     put("name", h.name)
                     put("emoji", h.emoji)
                     put("colorHex", h.colorHex)
+                    put("category", h.category)
                     put("activeDays", h.activeDays)
                     put("timeOfDay", h.timeOfDay)
                     put("reminderEnabled", h.reminderEnabled)
@@ -134,6 +136,7 @@ class SheetsExporter(private val webAppUrl: String) {
                             name = h.optString("name"),
                             emoji = h.optString("emoji", "\u2705"),
                             colorHex = h.optString("colorHex", "#7C6CF0"),
+                            category = h.optString("category", "SELF_DEVELOPMENT"),
                             activeDays = h.optInt("activeDays", 127),
                             timeOfDay = h.optString("timeOfDay", "MORNING"),
                             reminderEnabled = h.optBoolean("reminderEnabled", false),
