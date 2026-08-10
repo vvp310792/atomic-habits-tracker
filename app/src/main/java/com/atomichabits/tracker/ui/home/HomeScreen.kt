@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.Habit
-import com.atomichabits.tracker.sheets.SheetsSyncWorker
 import com.atomichabits.tracker.ui.components.DateProgressRing
 import com.atomichabits.tracker.ui.components.HabitCard
 import com.atomichabits.tracker.ui.components.SectionHeader
@@ -62,7 +61,6 @@ fun HomeScreen(
     val days = remember { (0 until DATE_WINDOW_DAYS).map { windowStart.plusDays(it) } }
 
     val windowLogs by app.repository.observeLogsBetween(windowStart, today).collectAsState(initial = emptyList())
-    val autoSync by app.settingsStore.autoSyncEnabled.collectAsState(initial = false)
     val scope = rememberCoroutineScope()
 
     var selectedDate by remember { mutableStateOf(today) }
@@ -139,7 +137,6 @@ fun HomeScreen(
             fun habitToggle(habit: Habit): () -> Unit = {
                 scope.launch {
                     app.repository.toggleCompletion(habit.id, selectedDate)
-                    if (autoSync) SheetsSyncWorker.syncNow(app)
                 }
             }
 

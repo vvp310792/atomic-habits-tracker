@@ -28,11 +28,15 @@ jobs:
         with:
           gradle-version: 8.9
 
+      - name: Write google-services.json
+        if: secrets.GOOGLE_SERVICES_JSON != ''
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
+
       - name: Build debug APK
         run: >
           gradle assembleDebug --stacktrace
           -PappVersionCode=${{ github.run_number }}
-          -PsheetsWebAppUrl="${{ secrets.SHEETS_WEBAPP_URL }}"
+          -PgoogleWebClientId="${{ secrets.GOOGLE_WEB_CLIENT_ID }}"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -56,24 +60,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Auto-deploys apps-script/HabitSheetSync.gs to your existing Apps Script
-  # project via clasp, so editing the .gs file and pushing to GitHub is enough -
-  # no manual copy-paste into the Apps Script editor needed. Entirely optional:
-  # if CLASP_CREDENTIALS / APPS_SCRIPT_ID aren't set as repo secrets, this job
-  # just skips its steps and does nothing. See docs/SETUP_GOOGLE_SHEETS.md for
-  # the one-time setup (requires logging clasp into your Google account locally
-  # once - this can't be done from CI itself).
-  deploy-apps-script:
+  # Auto-deploys firestore.rules to your Firebase project via the Firebase CLI,
+  # so editing the rules file and pushing to GitHub is enough - no manual step
+  # in the Firebase console needed. Entirely optional: if FIREBASE_SERVICE_ACCOUNT
+  # / FIREBASE_PROJECT_ID aren't set as repo secrets, this job just skips its
+  # steps and does nothing. See docs/SETUP_FIREBASE.md for the one-time setup.
+  deploy-firestore-rules:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check whether clasp is configured
+      - name: Check whether Firebase deploy is configured
         id: check
         run: |
-          if [ -n "${{ secrets.CLASP_CREDENTIALS }}" ] && [ -n "${{ secrets.APPS_SCRIPT_ID }}" ] && [ -n "${{ secrets.APPS_SCRIPT_DEPLOYMENT_ID }}" ]; then
+          if [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" ] && [ -n "${{ secrets.FIREBASE_PROJECT_ID }}" ]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
@@ -85,28 +87,16 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install clasp
+      - name: Write service account key
         if: steps.check.outputs.configured == 'true'
-        run: npm install -g @google/clasp
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/firebase-service-account.json
 
-      - name: Write clasp credentials
+      - name: Deploy Firestore rules
         if: steps.check.outputs.configured == 'true'
-        run: echo '${{ secrets.CLASP_CREDENTIALS }}' > ~/.clasprc.json
-
-      - name: Write .clasp.json
-        if: steps.check.outputs.configured == 'true'
-        working-directory: apps-script
-        run: echo "{\"scriptId\":\"${{ secrets.APPS_SCRIPT_ID }}\",\"rootDir\":\".\"}" > .clasp.json
-
-      - name: Push script source
-        if: steps.check.outputs.configured == 'true'
-        working-directory: apps-script
-        run: clasp push -f
-
-      - name: Deploy new version (keeps the same /exec URL)
-        if: steps.check.outputs.configured == 'true'
-        working-directory: apps-script
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-service-account.json
         run: >
-          clasp deploy
-          --deploymentId "${{ secrets.APPS_SCRIPT_DEPLOYMENT_ID }}"
-          --description "Auto-deploy build ${{ github.run_number }}"
+          npx firebase-tools@latest deploy
+          --only firestore:rules
+          --project "${{ secrets.FIREBASE_PROJECT_ID }}"
+          --non-interactive

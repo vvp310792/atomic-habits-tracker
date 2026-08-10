@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -19,19 +20,38 @@ android {
         versionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 1
         versionName = "1.0.${versionCode}"
 
-        // CI passes -PsheetsWebAppUrl=<secret> from a GitHub Actions secret, so the
-        // app ships pre-configured with your Apps Script URL without it ever being
-        // committed to the (possibly public) repo in plaintext. Empty for local
-        // builds where that property isn't set - the Settings screen still lets you
-        // paste the URL in by hand in that case, same as before.
+        // CI passes -PgoogleWebClientId=<secret> from a GitHub Actions secret (the
+        // "Web client ID" shown in Firebase Console -> Authentication -> Sign-in
+        // method -> Google, after enabling that provider). Required for Credential
+        // Manager's Sign in with Google flow. Empty for local builds where that
+        // property isn't set - sign-in just won't work until it's provided.
         buildConfigField(
             "String",
-            "DEFAULT_SHEETS_URL",
-            "\"${(project.findProperty("sheetsWebAppUrl") as String?) ?: ""}\""
+            "GOOGLE_WEB_CLIENT_ID",
+            "\"${(project.findProperty("googleWebClientId") as String?) ?: ""}\""
         )
 
         vectorDrawables {
             useSupportLibrary = true
+        }
+    }
+
+    signingConfigs {
+        // A fixed, checked-in debug keystore (keystore/debug.keystore) instead of
+        // the default machine-generated one. This matters specifically because
+        // Google Sign-In validates the calling app's signing certificate (SHA-1)
+        // against the one registered in the Firebase/Google Cloud console - if
+        // every CI run signed with a fresh random debug key, sign-in would break
+        // unpredictably. Using a fixed key keeps the SHA-1 stable across every
+        // build forever. This is a debug-only key with well-known default
+        // credentials (alias/password "androiddebugkey"/"android") - never used
+        // for a release/Play Store build, so there's nothing sensitive about
+        // committing it.
+        create("fixedDebug") {
+            storeFile = rootProject.file("keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
     }
 
@@ -45,7 +65,7 @@ android {
         }
         debug {
             isMinifyEnabled = false
-            applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("fixedDebug")
         }
     }
 
@@ -90,24 +110,28 @@ dependencies {
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.8.4")
 
-    // Room (local database)
+    // Room (local database - the on-device cache; Firestore is the cloud source of truth)
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
-    // WorkManager (background sync + reliable reminders after reboot)
-    implementation("androidx.work:work-runtime-ktx:2.10.0")
-
-    // Coroutines (used directly in BroadcastReceivers for background DB/network work)
+    // Coroutines (used directly in BroadcastReceivers for background DB work)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    // Lets suspend functions await() a Firebase Task (Auth/Firestore APIs return Tasks)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
-    // DataStore (settings: sheets URL, sync prefs)
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    // Firebase (Firestore = cloud database, Auth = Google Sign-In gating access to it)
+    implementation(platform("com.google.firebase:firebase-bom:34.16.0"))
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-auth")
 
-    // (30-day chart is drawn with plain Compose Canvas - no external charting
-    // library needed, avoids version/API churn.)
+    // Google Sign-In via Credential Manager (current recommended API, replaces the
+    // old deprecated GoogleSignInClient / GoogleSignInOptions approach)
+    implementation("androidx.credentials:credentials:1.5.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.2.0")
 
-    // Networking for Google Sheets (Apps Script webhook)
+    // Networking for the GitHub Releases update-checker (see update/)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     testImplementation("junit:junit:4.13.2")

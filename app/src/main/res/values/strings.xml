@@ -42,18 +42,12 @@
 
     <!-- Settings -->
     <string name="settings_title">Настройки</string>
-    <string name="settings_sheets_section">Google Таблицы</string>
-    <string name="settings_sheets_url_label">URL веб-приложения Apps Script</string>
-    <string name="settings_sheets_url_hint">https://script.google.com/macros/s/…/exec</string>
-    <string name="settings_sheets_autosync">Автосинхронизация</string>
-    <string name="settings_sheets_export_now">Экспортировать сейчас</string>
-    <string name="settings_sheets_success">Экспортировано успешно</string>
-    <string name="settings_sheets_error">Ошибка. Проверьте URL и подключение</string>
-    <string name="settings_sheets_restore">Восстановить из Google Таблиц</string>
-    <string name="settings_sheets_restore_hint">Используйте после переустановки приложения, чтобы вернуть привычки и историю.</string>
-    <string name="settings_sheets_restore_confirm">Данные из таблицы будут добавлены в приложение (существующие привычки обновятся, ничего локально не удалится). Продолжить?</string>
-    <string name="settings_sheets_restore_success">Восстановлено: %1$d привычек, %2$d отметок</string>
-    <string name="settings_sheets_restore_empty">В таблице пока ничего нет</string>
+    <string name="settings_account_section">Аккаунт и синхронизация</string>
+    <string name="settings_account_hint">Войдите через Google, чтобы привычки и история сохранялись в облаке и восстанавливались после переустановки приложения.</string>
+    <string name="settings_account_sign_in">Войти через Google</string>
+    <string name="settings_account_signed_in">Вход выполнен: %1$s</string>
+    <string name="settings_account_sign_out">Выйти</string>
+    <string name="settings_account_error">Не удалось войти. Попробуйте ещё раз</string>
     <string name="settings_notifications_section">Уведомления</string>
     <string name="settings_notifications_permission">Разрешить уведомления</string>
 

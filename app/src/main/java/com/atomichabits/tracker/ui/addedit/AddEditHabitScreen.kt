@@ -48,7 +48,6 @@ import com.atomichabits.tracker.util.ALL_DAYS_MASK
 import com.atomichabits.tracker.util.categoryColorHex
 import com.atomichabits.tracker.util.TIME_OF_DAY_VALUES
 import com.atomichabits.tracker.util.timeOfDayLabel
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -242,9 +241,6 @@ fun AddEditHabitScreen(
                         val savedId = app.repository.saveHabit(buildHabit())
                         val finalHabit = buildHabit().copy(id = if (id == 0L) savedId else id)
                         ReminderScheduler.schedule(context, finalHabit)
-                        if (app.settingsStore.autoSyncEnabled.first()) {
-                            com.atomichabits.tracker.sheets.SheetsSyncWorker.syncNow(context)
-                        }
                         onDone()
                     }
                 },
@@ -289,9 +285,6 @@ fun AddEditHabitScreen(
                         habitId?.let {
                             app.repository.archiveHabit(it)
                             ReminderScheduler.cancel(context, it)
-                        }
-                        if (app.settingsStore.autoSyncEnabled.first()) {
-                            com.atomichabits.tracker.sheets.SheetsSyncWorker.syncNow(context)
                         }
                         showDeleteConfirm = false
                         onDone()

@@ -1,11 +1,14 @@
 package com.atomichabits.tracker.data
 
+import com.atomichabits.tracker.sync.FirestoreSyncManager
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
 class HabitRepository(
     private val habitDao: HabitDao,
-    private val habitLogDao: HabitLogDao
+    private val habitLogDao: HabitLogDao,
+    private val syncManager: FirestoreSyncManager? = null,
+    private val currentUid: () -> String? = { null }
 ) {
     fun observeActiveHabits(): Flow<List<Habit>> = habitDao.observeActiveHabits()
 
@@ -23,9 +26,16 @@ class HabitRepository(
     fun observeLogsSince(habitId: Long, since: LocalDate): Flow<List<HabitLog>> =
         habitLogDao.observeLogsSince(habitId, since.toEpochDay())
 
-    suspend fun saveHabit(habit: Habit): Long = habitDao.upsert(habit)
+    suspend fun saveHabit(habit: Habit): Long {
+        val id = habitDao.upsert(habit)
+        pushHabitIfSignedIn(if (habit.id == 0L) habit.copy(id = id) else habit)
+        return id
+    }
 
-    suspend fun archiveHabit(habitId: Long) = habitDao.archive(habitId)
+    suspend fun archiveHabit(habitId: Long) {
+        habitDao.archive(habitId)
+        habitDao.getHabit(habitId)?.let { pushHabitIfSignedIn(it) }
+    }
 
     suspend fun deleteHabit(habit: Habit) = habitDao.delete(habit)
 
@@ -35,12 +45,26 @@ class HabitRepository(
         val existing = habitLogDao.getForDate(habitId, epochDay)
         return if (existing != null) {
             habitLogDao.deleteForDate(habitId, epochDay)
+            val uid = currentUid()
+            if (uid != null && syncManager != null) {
+                habitDao.getHabit(habitId)?.let { syncManager.deleteLog(uid, it.syncId, epochDay) }
+            }
             false
         } else {
-            habitLogDao.upsert(
-                HabitLog(habitId = habitId, dateEpochDay = epochDay, completed = true)
-            )
+            val log = HabitLog(habitId = habitId, dateEpochDay = epochDay, completed = true)
+            habitLogDao.upsert(log)
+            val uid = currentUid()
+            if (uid != null && syncManager != null) {
+                habitDao.getHabit(habitId)?.let { syncManager.pushLog(uid, it, log) }
+            }
             true
+        }
+    }
+
+    private fun pushHabitIfSignedIn(habit: Habit) {
+        val uid = currentUid()
+        if (uid != null && syncManager != null) {
+            syncManager.pushHabit(uid, habit)
         }
     }
 

@@ -5,12 +5,10 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -19,14 +17,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,14 +35,11 @@ import androidx.core.content.ContextCompat
 import com.atomichabits.tracker.BuildConfig
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
-import com.atomichabits.tracker.sheets.RestoreOutcome
-import com.atomichabits.tracker.sheets.SheetsExporter
-import com.atomichabits.tracker.sheets.SheetsRestoreManager
-import com.atomichabits.tracker.sheets.SheetsSyncWorker
 import com.atomichabits.tracker.update.ApkInstaller
 import com.atomichabits.tracker.update.UpdateCheckResult
 import com.atomichabits.tracker.update.UpdateChecker
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -57,24 +49,20 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var sheetsUrl by remember { mutableStateOf("") }
-    var autoSync by remember { mutableStateOf(false) }
-    var statusMessage by remember { mutableStateOf<String?>(null) }
-    var testing by remember { mutableStateOf(false) }
-    var restoring by remember { mutableStateOf(false) }
-    var showRestoreConfirm by remember { mutableStateOf(false) }
+    var currentUserEmail by remember { mutableStateOf(app.authManager.currentUser?.email) }
+    var signingIn by remember { mutableStateOf(false) }
+    var authMessage by remember { mutableStateOf<String?>(null) }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        app.authManager.authStateFlow().collectLatest { user ->
+            currentUserEmail = user?.email
+        }
+    }
 
     var checkingUpdate by remember { mutableStateOf(false) }
     var downloadingUpdate by remember { mutableStateOf(false) }
     var updateResult by remember { mutableStateOf<UpdateCheckResult?>(null) }
     var updateMessage by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(Unit) {
-        app.settingsStore.sheetsUrl.collect { sheetsUrl = it }
-    }
-    LaunchedEffect(Unit) {
-        app.settingsStore.autoSyncEnabled.collect { autoSync = it }
-    }
 
     val notificationsGranted = Build.VERSION.SDK_INT < 33 ||
         ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
@@ -99,68 +87,47 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(stringResource(R.string.settings_sheets_section), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.settings_account_section), style = MaterialTheme.typography.titleMedium)
 
-                OutlinedTextField(
-                    value = sheetsUrl,
-                    onValueChange = {
-                        sheetsUrl = it
-                        scope.launch { app.settingsStore.setSheetsUrl(it) }
-                    },
-                    label = { Text(stringResource(R.string.settings_sheets_url_label)) },
-                    placeholder = { Text(stringResource(R.string.settings_sheets_url_hint)) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(stringResource(R.string.settings_sheets_autosync))
-                    Switch(
-                        checked = autoSync,
-                        onCheckedChange = {
-                            autoSync = it
-                            scope.launch { app.settingsStore.setAutoSync(it) }
-                        }
+                if (currentUserEmail != null) {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                        Text(
+                            "\u2705 " + stringResource(R.string.settings_account_signed_in, currentUserEmail!!),
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = { app.authManager.signOut() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.settings_account_sign_out))
+                    }
+                } else {
+                    Text(
+                        stringResource(R.string.settings_account_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
-                }
-
-                Button(
-                    onClick = {
-                        testing = true
-                        statusMessage = null
-                        scope.launch {
-                            val ok = withContext(Dispatchers.IO) {
-                                SheetsExporter(sheetsUrl).ping()
+                    Button(
+                        onClick = {
+                            signingIn = true
+                            authMessage = null
+                            scope.launch {
+                                val result = app.authManager.signIn(context)
+                                signingIn = false
+                                authMessage = result.exceptionOrNull()?.let {
+                                    context.getString(R.string.settings_account_error)
+                                }
                             }
-                            statusMessage = if (ok) context.getString(R.string.settings_sheets_success)
-                            else context.getString(R.string.settings_sheets_error)
-                            testing = false
-                            if (ok) SheetsSyncWorker.syncNow(context)
-                        }
-                    },
-                    enabled = sheetsUrl.isNotBlank() && !testing,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.settings_sheets_export_now))
-                }
-
-                OutlinedButton(
-                    onClick = { showRestoreConfirm = true },
-                    enabled = sheetsUrl.isNotBlank() && !restoring,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.settings_sheets_restore))
-                }
-                Text(
-                    stringResource(R.string.settings_sheets_restore_hint),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-
-                statusMessage?.let {
-                    Text(it, style = MaterialTheme.typography.bodyMedium)
+                        },
+                        enabled = !signingIn,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.settings_account_sign_in))
+                    }
+                    authMessage?.let {
+                        Text(it, style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
 
@@ -250,38 +217,5 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: () -> Unit) {
                 }
             }
         }
-    }
-
-    if (showRestoreConfirm) {
-        AlertDialog(
-            onDismissRequest = { showRestoreConfirm = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    showRestoreConfirm = false
-                    restoring = true
-                    statusMessage = null
-                    scope.launch {
-                        val outcome = SheetsRestoreManager.restore(context, sheetsUrl)
-                        statusMessage = when (outcome) {
-                            is RestoreOutcome.Success -> context.getString(
-                                R.string.settings_sheets_restore_success,
-                                outcome.habitsRestored,
-                                outcome.logsRestored
-                            )
-                            is RestoreOutcome.NothingFound -> context.getString(R.string.settings_sheets_restore_empty)
-                            is RestoreOutcome.Failed -> context.getString(R.string.settings_sheets_error)
-                        }
-                        restoring = false
-                    }
-                }) { Text(stringResource(R.string.settings_sheets_restore)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRestoreConfirm = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-            title = { Text(stringResource(R.string.settings_sheets_restore)) },
-            text = { Text(stringResource(R.string.settings_sheets_restore_confirm)) }
-        )
     }
 }
