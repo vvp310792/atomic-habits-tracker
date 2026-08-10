@@ -1,3 +1,8 @@
+// Not a secret - see the comment on GOOGLE_WEB_CLIENT_ID below.
+// TODO: fill in once the Google provider is enabled in Firebase Console
+// (Authentication -> Sign-in method -> Google -> "Web client ID").
+val GOOGLE_WEB_CLIENT_ID_DEFAULT = ""
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -20,16 +25,12 @@ android {
         versionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 1
         versionName = "1.0.${versionCode}"
 
-        // CI passes -PgoogleWebClientId=<secret> from a GitHub Actions secret (the
-        // "Web client ID" shown in Firebase Console -> Authentication -> Sign-in
-        // method -> Google, after enabling that provider). Required for Credential
-        // Manager's Sign in with Google flow. Empty for local builds where that
-        // property isn't set - sign-in just won't work until it's provided.
-        buildConfigField(
-            "String",
-            "GOOGLE_WEB_CLIENT_ID",
-            "\"${(project.findProperty("googleWebClientId") as String?) ?: ""}\""
-        )
+        // Web client ID from Firebase Console -> Authentication -> Sign-in method
+        // -> Google (after enabling that provider). Not a secret - it's a public
+        // OAuth client identifier, safe to commit like google-services.json - so
+        // it's just hardcoded here directly rather than routed through a CI
+        // secret. Update this constant once the Google provider is enabled.
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$GOOGLE_WEB_CLIENT_ID_DEFAULT\"")
 
         vectorDrawables {
             useSupportLibrary = true

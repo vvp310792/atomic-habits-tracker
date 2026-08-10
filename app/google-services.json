@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "000000000000",
-    "project_id": "REPLACE_WITH_REAL_FIREBASE_CONFIG",
-    "storage_bucket": "placeholder-project.appspot.com"
+    "project_number": "992403696762",
+    "project_id": "atomic-habits-17a37",
+    "storage_bucket": "atomic-habits-17a37.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+        "mobilesdk_app_id": "1:992403696762:android:d0a578ba4bc80297fb1fc3",
         "android_client_info": {
           "package_name": "com.atomichabits.tracker"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "PLACEHOLDER_API_KEY"
+          "current_key": "AIzaSyD-ripvZSZrjO5MZh3iGzYy_V83z0RAhR0"
         }
       ],
       "services": {

@@ -28,15 +28,8 @@ jobs:
         with:
           gradle-version: 8.9
 
-      - name: Write google-services.json
-        if: secrets.GOOGLE_SERVICES_JSON != ''
-        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
-
       - name: Build debug APK
-        run: >
-          gradle assembleDebug --stacktrace
-          -PappVersionCode=${{ github.run_number }}
-          -PgoogleWebClientId="${{ secrets.GOOGLE_WEB_CLIENT_ID }}"
+        run: gradle assembleDebug --stacktrace -PappVersionCode=${{ github.run_number }}
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -63,11 +56,13 @@ jobs:
   # Auto-deploys firestore.rules to your Firebase project via the Firebase CLI,
   # so editing the rules file and pushing to GitHub is enough - no manual step
   # in the Firebase console needed. Entirely optional: if FIREBASE_SERVICE_ACCOUNT
-  # / FIREBASE_PROJECT_ID aren't set as repo secrets, this job just skips its
-  # steps and does nothing. See docs/SETUP_FIREBASE.md for the one-time setup.
+  # isn't set as a repo secret, this job just skips its steps and does nothing.
+  # See docs/SETUP_FIREBASE.md for the one-time setup.
   deploy-firestore-rules:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
+    env:
+      FIREBASE_PROJECT_ID: atomic-habits-17a37
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -75,7 +70,7 @@ jobs:
       - name: Check whether Firebase deploy is configured
         id: check
         run: |
-          if [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" ] && [ -n "${{ secrets.FIREBASE_PROJECT_ID }}" ]; then
+          if [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" ]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
@@ -98,5 +93,5 @@ jobs:
         run: >
           npx firebase-tools@latest deploy
           --only firestore:rules
-          --project "${{ secrets.FIREBASE_PROJECT_ID }}"
+          --project "$FIREBASE_PROJECT_ID"
           --non-interactive
