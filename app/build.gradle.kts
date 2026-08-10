@@ -1,7 +1,5 @@
 // Not a secret - see the comment on GOOGLE_WEB_CLIENT_ID below.
-// TODO: fill in once the Google provider is enabled in Firebase Console
-// (Authentication -> Sign-in method -> Google -> "Web client ID").
-val GOOGLE_WEB_CLIENT_ID_DEFAULT = ""
+val GOOGLE_WEB_CLIENT_ID_DEFAULT = "992403696762-uclk49gh10k9ot1fncppqb0d66dt0g80.apps.googleusercontent.com"
 
 plugins {
     id("com.android.application")
