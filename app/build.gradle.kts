@@ -4,8 +4,8 @@ val GOOGLE_WEB_CLIENT_ID_DEFAULT = "992403696762-uclk49gh10k9ot1fncppqb0d66dt0g8
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.kapt")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("com.google.devtools.ksp")
     id("com.google.gms.google-services")
 }
 
@@ -115,7 +115,7 @@ dependencies {
     // Room (local database - the on-device cache; Firestore is the cloud source of truth)
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
 
     // Coroutines (used directly in BroadcastReceivers for background DB work)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
