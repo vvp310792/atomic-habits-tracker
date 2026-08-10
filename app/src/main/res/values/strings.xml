@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Атомные привычки</string>
+
+    <!-- Home -->
+    <string name="home_title">Сегодня</string>
+    <string name="home_empty">Пока нет привычек. Нажмите «+», чтобы добавить первую.</string>
+    <string name="streak_days">%1$d дн. подряд</string>
+
+    <!-- Add / Edit habit -->
+    <string name="add_habit_title">Новая привычка</string>
+    <string name="edit_habit_title">Редактировать привычку</string>
+    <string name="field_name">Название привычки</string>
+    <string name="field_icon">Иконка</string>
+    <string name="field_color">Цвет</string>
+    <string name="field_frequency">Дни недели</string>
+    <string name="field_reminder">Напоминание</string>
+    <string name="field_reminder_time">Время напоминания</string>
+    <string name="save">Сохранить</string>
+    <string name="delete">Удалить</string>
+    <string name="cancel">Отмена</string>
+
+    <!-- 4 laws of James Clear -->
+    <string name="laws_title">4 закона атомных привычек</string>
+    <string name="law_obvious_title">1. Сделай очевидной</string>
+    <string name="law_obvious_hint">Где и когда именно вы будете это делать? (напр. «После утреннего кофе, на кухне»)</string>
+    <string name="law_attractive_title">2. Сделай привлекательной</string>
+    <string name="law_attractive_hint">Как связать привычку с чем-то приятным? (temptation bundling, habit stacking)</string>
+    <string name="law_easy_title">3. Сделай лёгкой</string>
+    <string name="law_easy_hint">Как упростить первый шаг до 2 минут?</string>
+    <string name="law_satisfying_title">4. Сделай приятной</string>
+    <string name="law_satisfying_hint">Чем вы себя вознаградите сразу после выполнения?</string>
+
+    <!-- Detail -->
+    <string name="detail_current_streak">Текущая серия</string>
+    <string name="detail_best_streak">Лучшая серия</string>
+    <string name="detail_completion_rate">Выполнено</string>
+    <string name="detail_chart_title">Последние 30 дней</string>
+    <string name="detail_heatmap_title">Календарь</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Настройки</string>
+    <string name="settings_sheets_section">Google Таблицы</string>
+    <string name="settings_sheets_url_label">URL веб-приложения Apps Script</string>
+    <string name="settings_sheets_url_hint">https://script.google.com/macros/s/…/exec</string>
+    <string name="settings_sheets_autosync">Автосинхронизация</string>
+    <string name="settings_sheets_export_now">Экспортировать сейчас</string>
+    <string name="settings_sheets_success">Экспортировано успешно</string>
+    <string name="settings_sheets_error">Ошибка экспорта. Проверьте URL и подключение</string>
+    <string name="settings_notifications_section">Уведомления</string>
+    <string name="settings_notifications_permission">Разрешить уведомления</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_name">Напоминания о привычках</string>
+    <string name="notif_channel_desc">Ежедневные напоминания для выполнения привычек</string>
+    <string name="notif_title">Пора: %1$s</string>
+    <string name="notif_text">Отметьте привычку как выполненную</string>
+    <string name="notif_action_done">Готово ✓</string>
+</resources>
