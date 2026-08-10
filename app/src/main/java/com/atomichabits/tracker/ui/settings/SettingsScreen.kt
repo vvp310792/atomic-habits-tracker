@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -17,10 +18,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,7 +39,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
+import com.atomichabits.tracker.sheets.RestoreOutcome
 import com.atomichabits.tracker.sheets.SheetsExporter
+import com.atomichabits.tracker.sheets.SheetsRestoreManager
 import com.atomichabits.tracker.sheets.SheetsSyncWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -52,6 +57,8 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: () -> Unit) {
     var autoSync by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
+    var restoring by remember { mutableStateOf(false) }
+    var showRestoreConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         app.settingsStore.sheetsUrl.collect { sheetsUrl = it }
@@ -130,6 +137,19 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: () -> Unit) {
                     Text(stringResource(R.string.settings_sheets_export_now))
                 }
 
+                OutlinedButton(
+                    onClick = { showRestoreConfirm = true },
+                    enabled = sheetsUrl.isNotBlank() && !restoring,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.settings_sheets_restore))
+                }
+                Text(
+                    stringResource(R.string.settings_sheets_restore_hint),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+
                 statusMessage?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium)
                 }
@@ -147,5 +167,38 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: () -> Unit) {
                 }
             }
         }
+    }
+
+    if (showRestoreConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRestoreConfirm = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    showRestoreConfirm = false
+                    restoring = true
+                    statusMessage = null
+                    scope.launch {
+                        val outcome = SheetsRestoreManager.restore(context, sheetsUrl)
+                        statusMessage = when (outcome) {
+                            is RestoreOutcome.Success -> context.getString(
+                                R.string.settings_sheets_restore_success,
+                                outcome.habitsRestored,
+                                outcome.logsRestored
+                            )
+                            is RestoreOutcome.NothingFound -> context.getString(R.string.settings_sheets_restore_empty)
+                            is RestoreOutcome.Failed -> context.getString(R.string.settings_sheets_error)
+                        }
+                        restoring = false
+                    }
+                }) { Text(stringResource(R.string.settings_sheets_restore)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRestoreConfirm = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+            title = { Text(stringResource(R.string.settings_sheets_restore)) },
+            text = { Text(stringResource(R.string.settings_sheets_restore_confirm)) }
+        )
     }
 }

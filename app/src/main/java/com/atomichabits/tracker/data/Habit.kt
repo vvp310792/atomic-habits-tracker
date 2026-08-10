@@ -1,10 +1,17 @@
 package com.atomichabits.tracker.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
  * A single habit definition.
+ *
+ * [id] is the local Room row id - it is NOT stable across a reinstall (a fresh
+ * install starts autoGenerate back at 1). [syncId] is a UUID generated once when
+ * the habit is first created and never changes; it's what ties a habit to its
+ * row in Google Sheets and to its logs, so a reinstall can be matched back up
+ * correctly even though [id] itself is different afterwards.
  *
  * [activeDays] is a bitmask, bit 0 = Monday ... bit 6 = Sunday (matches [java.time.DayOfWeek].value - 1).
  * A value of 127 (0b1111111) means "every day".
@@ -16,9 +23,10 @@ import androidx.room.PrimaryKey
  *   3. lawEasy        -> Make it Easy      (two-minute version / friction reduction)
  *   4. lawSatisfying  -> Make it Satisfying (immediate reward / tracking)
  */
-@Entity(tableName = "habits")
+@Entity(tableName = "habits", indices = [Index(value = ["syncId"], unique = true)])
 data class Habit(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val syncId: String = "",
     val name: String,
     val emoji: String = "\u2705",
     val colorHex: String = "#7C6CF0",

@@ -20,8 +20,15 @@ interface HabitDao {
     @Query("SELECT * FROM habits WHERE id = :habitId")
     suspend fun getHabit(habitId: Long): Habit?
 
+    @Query("SELECT * FROM habits WHERE syncId = :syncId LIMIT 1")
+    suspend fun getBySyncId(syncId: String): Habit?
+
     @Query("SELECT * FROM habits WHERE archived = 0")
     suspend fun getAllActiveOnce(): List<Habit>
+
+    /** Includes archived habits - used for the full definitions push so archived state round-trips too. */
+    @Query("SELECT * FROM habits")
+    suspend fun getAllOnce(): List<Habit>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(habit: Habit): Long

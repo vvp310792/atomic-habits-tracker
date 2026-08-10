@@ -25,18 +25,20 @@ class SheetsSyncWorker(appContext: Context, params: WorkerParameters) :
         val logDao = app.database.habitLogDao()
         val habitDao = app.database.habitDao()
 
+        val allHabits = habitDao.getAllOnce()
         val unsynced = logDao.getUnsyncedLogs()
-        if (unsynced.isEmpty()) return Result.success()
-
-        val rows = unsynced.mapNotNull { log ->
-            habitDao.getHabit(log.habitId)?.let { habit -> habit to log }
+        val logRows = unsynced.mapNotNull { log ->
+            allHabits.find { it.id == log.habitId }?.let { habit -> habit to log }
         }
 
+        // Nothing to push at all (no habits ever created, nothing changed) - skip network call.
+        if (allHabits.isEmpty() && logRows.isEmpty()) return Result.success()
+
         val exporter = SheetsExporter(url)
-        val ok = exporter.export(rows)
+        val ok = exporter.push(allHabits, logRows)
 
         return if (ok) {
-            logDao.markSynced(unsynced.map { it.id })
+            if (unsynced.isNotEmpty()) logDao.markSynced(unsynced.map { it.id })
             Result.success()
         } else {
             Result.retry()

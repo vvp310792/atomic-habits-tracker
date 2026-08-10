@@ -44,6 +44,7 @@ import com.atomichabits.tracker.ui.components.EmojiPicker
 import com.atomichabits.tracker.ui.components.LawSection
 import com.atomichabits.tracker.ui.components.WeekdayPicker
 import com.atomichabits.tracker.util.ALL_DAYS_MASK
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -58,6 +59,7 @@ fun AddEditHabitScreen(
     val scope = rememberCoroutineScope()
 
     var id by remember { mutableStateOf(0L) }
+    var syncId by remember { mutableStateOf(java.util.UUID.randomUUID().toString()) }
     var name by remember { mutableStateOf("") }
     var emoji by remember { mutableStateOf("\u2705") }
     var colorHex by remember { mutableStateOf("#7C6CF0") }
@@ -77,6 +79,7 @@ fun AddEditHabitScreen(
         if (habitId != null) {
             app.database.habitDao().getHabit(habitId)?.let { h ->
                 id = h.id
+                syncId = h.syncId
                 name = h.name
                 emoji = h.emoji
                 colorHex = h.colorHex
@@ -95,6 +98,7 @@ fun AddEditHabitScreen(
 
     fun buildHabit() = Habit(
         id = id,
+        syncId = syncId,
         name = name.trim(),
         emoji = emoji,
         colorHex = colorHex,
@@ -209,6 +213,9 @@ fun AddEditHabitScreen(
                         val savedId = app.repository.saveHabit(buildHabit())
                         val finalHabit = buildHabit().copy(id = if (id == 0L) savedId else id)
                         ReminderScheduler.schedule(context, finalHabit)
+                        if (app.settingsStore.autoSyncEnabled.first()) {
+                            com.atomichabits.tracker.sheets.SheetsSyncWorker.syncNow(context)
+                        }
                         onDone()
                     }
                 },
@@ -253,6 +260,9 @@ fun AddEditHabitScreen(
                         habitId?.let {
                             app.repository.archiveHabit(it)
                             ReminderScheduler.cancel(context, it)
+                        }
+                        if (app.settingsStore.autoSyncEnabled.first()) {
+                            com.atomichabits.tracker.sheets.SheetsSyncWorker.syncNow(context)
                         }
                         showDeleteConfirm = false
                         onDone()

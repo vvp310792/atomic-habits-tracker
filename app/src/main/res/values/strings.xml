@@ -46,7 +46,12 @@
     <string name="settings_sheets_autosync">Автосинхронизация</string>
     <string name="settings_sheets_export_now">Экспортировать сейчас</string>
     <string name="settings_sheets_success">Экспортировано успешно</string>
-    <string name="settings_sheets_error">Ошибка экспорта. Проверьте URL и подключение</string>
+    <string name="settings_sheets_error">Ошибка. Проверьте URL и подключение</string>
+    <string name="settings_sheets_restore">Восстановить из Google Таблиц</string>
+    <string name="settings_sheets_restore_hint">Используйте после переустановки приложения, чтобы вернуть привычки и историю.</string>
+    <string name="settings_sheets_restore_confirm">Данные из таблицы будут добавлены в приложение (существующие привычки обновятся, ничего локально не удалится). Продолжить?</string>
+    <string name="settings_sheets_restore_success">Восстановлено: %1$d привычек, %2$d отметок</string>
+    <string name="settings_sheets_restore_empty">В таблице пока ничего нет</string>
     <string name="settings_notifications_section">Уведомления</string>
     <string name="settings_notifications_permission">Разрешить уведомления</string>
 
