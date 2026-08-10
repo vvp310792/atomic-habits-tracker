@@ -90,8 +90,8 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     // Charts (Compose-native)
-    implementation("com.patrykandpatrick.vico:compose:3.2.2")
-    implementation("com.patrykandpatrick.vico:compose-m3:3.2.2")
+    implementation("com.patrykandpatrick.vico:compose:2.1.2")
+    implementation("com.patrykandpatrick.vico:compose-m3:2.1.2")
 
     // Networking for Google Sheets (Apps Script webhook)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
