@@ -22,6 +22,9 @@ import androidx.room.PrimaryKey
  *   2. lawAttractive  -> Make it Attractive (habit stacking / temptation bundling)
  *   3. lawEasy        -> Make it Easy      (two-minute version / friction reduction)
  *   4. lawSatisfying  -> Make it Satisfying (immediate reward / tracking)
+ *
+ * [timeOfDay] groups the habit into one of the Home screen's three sections:
+ * "MORNING", "DAY", or "EVENING".
  */
 @Entity(tableName = "habits", indices = [Index(value = ["syncId"], unique = true)])
 data class Habit(
@@ -31,6 +34,7 @@ data class Habit(
     val emoji: String = "\u2705",
     val colorHex: String = "#7C6CF0",
     val activeDays: Int = 127,
+    val timeOfDay: String = "MORNING",
     val reminderEnabled: Boolean = false,
     val reminderHour: Int = 9,
     val reminderMinute: Int = 0,

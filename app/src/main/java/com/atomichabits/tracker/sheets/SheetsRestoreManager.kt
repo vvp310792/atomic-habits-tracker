@@ -46,6 +46,7 @@ object SheetsRestoreManager {
                 emoji = r.emoji,
                 colorHex = r.colorHex,
                 activeDays = r.activeDays,
+                timeOfDay = r.timeOfDay,
                 reminderEnabled = r.reminderEnabled,
                 reminderHour = r.reminderHour,
                 reminderMinute = r.reminderMinute,

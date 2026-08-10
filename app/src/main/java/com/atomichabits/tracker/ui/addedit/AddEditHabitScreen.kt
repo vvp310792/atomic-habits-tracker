@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,6 +45,8 @@ import com.atomichabits.tracker.ui.components.EmojiPicker
 import com.atomichabits.tracker.ui.components.LawSection
 import com.atomichabits.tracker.ui.components.WeekdayPicker
 import com.atomichabits.tracker.util.ALL_DAYS_MASK
+import com.atomichabits.tracker.util.TIME_OF_DAY_VALUES
+import com.atomichabits.tracker.util.timeOfDayLabel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -64,6 +67,7 @@ fun AddEditHabitScreen(
     var emoji by remember { mutableStateOf("\u2705") }
     var colorHex by remember { mutableStateOf("#7C6CF0") }
     var activeDays by remember { mutableStateOf(ALL_DAYS_MASK) }
+    var timeOfDay by remember { mutableStateOf("MORNING") }
     var reminderEnabled by remember { mutableStateOf(false) }
     var reminderHour by remember { mutableStateOf(9) }
     var reminderMinute by remember { mutableStateOf(0) }
@@ -84,6 +88,7 @@ fun AddEditHabitScreen(
                 emoji = h.emoji
                 colorHex = h.colorHex
                 activeDays = h.activeDays
+                timeOfDay = h.timeOfDay
                 reminderEnabled = h.reminderEnabled
                 reminderHour = h.reminderHour
                 reminderMinute = h.reminderMinute
@@ -103,6 +108,7 @@ fun AddEditHabitScreen(
         emoji = emoji,
         colorHex = colorHex,
         activeDays = activeDays,
+        timeOfDay = timeOfDay,
         reminderEnabled = reminderEnabled,
         reminderHour = reminderHour,
         reminderMinute = reminderMinute,
@@ -159,6 +165,19 @@ fun AddEditHabitScreen(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.field_frequency), style = MaterialTheme.typography.labelLarge)
                 WeekdayPicker(activeDays = activeDays, onChange = { activeDays = it })
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.field_time_of_day), style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TIME_OF_DAY_VALUES.forEach { value ->
+                        FilterChip(
+                            selected = timeOfDay == value,
+                            onClick = { timeOfDay = value },
+                            label = { Text(timeOfDayLabel(value)) }
+                        )
+                    }
+                }
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -11,7 +11,18 @@ fun isDayActive(activeDays: Int, bitIndex: Int): Boolean = (activeDays shr bitIn
 
 fun toggleDay(activeDays: Int, bitIndex: Int): Int = activeDays xor (1 shl bitIndex)
 
-fun isHabitScheduledToday(activeDays: Int): Boolean {
-    val bit = LocalDate.now().dayOfWeek.value - 1
+fun isHabitScheduledOn(activeDays: Int, date: LocalDate): Boolean {
+    val bit = date.dayOfWeek.value - 1
     return isDayActive(activeDays, bit)
+}
+
+fun isHabitScheduledToday(activeDays: Int): Boolean = isHabitScheduledOn(activeDays, LocalDate.now())
+
+/** Storage values for Habit.timeOfDay, in display order. */
+val TIME_OF_DAY_VALUES = listOf("MORNING", "DAY", "EVENING")
+
+fun timeOfDayLabel(value: String): String = when (value) {
+    "DAY" -> "День"
+    "EVENING" -> "Вечер"
+    else -> "Утро"
 }

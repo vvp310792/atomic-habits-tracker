@@ -14,6 +14,9 @@ class HabitRepository(
     fun observeLogsForDate(date: LocalDate): Flow<List<HabitLog>> =
         habitLogDao.observeLogsForDate(date.toEpochDay())
 
+    fun observeLogsBetween(from: LocalDate, to: LocalDate): Flow<List<HabitLog>> =
+        habitLogDao.observeLogsBetween(from.toEpochDay(), to.toEpochDay())
+
     fun observeLogsForHabit(habitId: Long): Flow<List<HabitLog>> =
         habitLogDao.observeLogsForHabit(habitId)
 

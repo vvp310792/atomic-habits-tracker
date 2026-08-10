@@ -14,6 +14,7 @@
     <string name="field_icon">Иконка</string>
     <string name="field_color">Цвет</string>
     <string name="field_frequency">Дни недели</string>
+    <string name="field_time_of_day">Время дня</string>
     <string name="field_reminder">Напоминание</string>
     <string name="field_reminder_time">Время напоминания</string>
     <string name="save">Сохранить</string>
