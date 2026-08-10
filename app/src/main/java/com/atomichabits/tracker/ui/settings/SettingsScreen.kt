@@ -196,7 +196,7 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: () -> Unit) {
                             updateResult = result
                             updateMessage = when (result) {
                                 is UpdateCheckResult.UpToDate -> context.getString(R.string.settings_updates_uptodate)
-                                is UpdateCheckResult.Failed -> context.getString(R.string.settings_updates_error)
+                                is UpdateCheckResult.Failed -> result.reason
                                 is UpdateCheckResult.UpdateAvailable -> context.getString(
                                     R.string.settings_updates_available,
                                     result.release.releaseName

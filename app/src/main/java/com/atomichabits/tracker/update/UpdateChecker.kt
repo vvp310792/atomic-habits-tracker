@@ -22,7 +22,7 @@ data class ReleaseInfo(
 sealed class UpdateCheckResult {
     data class UpdateAvailable(val release: ReleaseInfo) : UpdateCheckResult()
     data object UpToDate : UpdateCheckResult()
-    data object Failed : UpdateCheckResult()
+    data class Failed(val reason: String) : UpdateCheckResult()
 }
 
 object UpdateChecker {
@@ -45,14 +45,22 @@ object UpdateChecker {
 
         return try {
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return UpdateCheckResult.Failed
+                if (!response.isSuccessful) {
+                    val reason = when (response.code) {
+                        404 -> "GitHub: релизов ещё нет (HTTP 404). Проверьте вкладку Releases в репозитории."
+                        403 -> "GitHub: превышен лимит запросов (HTTP 403). Попробуйте позже."
+                        else -> "GitHub вернул ошибку HTTP ${response.code}."
+                    }
+                    return UpdateCheckResult.Failed(reason)
+                }
                 val json = JSONObject(response.body?.string().orEmpty())
 
                 val tagName = json.optString("tag_name") // e.g. "build-42"
                 val versionCode = tagName.substringAfterLast('-').toIntOrNull()
-                    ?: return UpdateCheckResult.Failed
+                    ?: return UpdateCheckResult.Failed("Не удалось разобрать номер версии из тега \"$tagName\".")
 
-                val assets = json.optJSONArray("assets") ?: return UpdateCheckResult.Failed
+                val assets = json.optJSONArray("assets")
+                    ?: return UpdateCheckResult.Failed("В последнем релизе нет вложенных файлов.")
                 var apkUrl: String? = null
                 for (i in 0 until assets.length()) {
                     val asset = assets.getJSONObject(i)
@@ -62,7 +70,9 @@ object UpdateChecker {
                         break
                     }
                 }
-                if (apkUrl.isNullOrBlank()) return UpdateCheckResult.Failed
+                if (apkUrl.isNullOrBlank()) {
+                    return UpdateCheckResult.Failed("В последнем релизе нет .apk файла.")
+                }
 
                 if (versionCode <= currentVersionCode) {
                     UpdateCheckResult.UpToDate
@@ -77,9 +87,9 @@ object UpdateChecker {
                 }
             }
         } catch (e: IOException) {
-            UpdateCheckResult.Failed
+            UpdateCheckResult.Failed("Ошибка сети: ${e.message ?: "нет подключения"}.")
         } catch (e: Exception) {
-            UpdateCheckResult.Failed
+            UpdateCheckResult.Failed("Неожиданная ошибка: ${e.message ?: e.javaClass.simpleName}.")
         }
     }
 }

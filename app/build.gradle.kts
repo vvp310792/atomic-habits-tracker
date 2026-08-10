@@ -19,6 +19,17 @@ android {
         versionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 1
         versionName = "1.0.${versionCode}"
 
+        // CI passes -PsheetsWebAppUrl=<secret> from a GitHub Actions secret, so the
+        // app ships pre-configured with your Apps Script URL without it ever being
+        // committed to the (possibly public) repo in plaintext. Empty for local
+        // builds where that property isn't set - the Settings screen still lets you
+        // paste the URL in by hand in that case, same as before.
+        buildConfigField(
+            "String",
+            "DEFAULT_SHEETS_URL",
+            "\"${(project.findProperty("sheetsWebAppUrl") as String?) ?: ""}\""
+        )
+
         vectorDrawables {
             useSupportLibrary = true
         }
