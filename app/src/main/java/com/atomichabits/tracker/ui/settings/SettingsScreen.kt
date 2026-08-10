@@ -37,12 +37,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.atomichabits.tracker.BuildConfig
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.sheets.RestoreOutcome
 import com.atomichabits.tracker.sheets.SheetsExporter
 import com.atomichabits.tracker.sheets.SheetsRestoreManager
 import com.atomichabits.tracker.sheets.SheetsSyncWorker
+import com.atomichabits.tracker.update.ApkInstaller
+import com.atomichabits.tracker.update.UpdateCheckResult
+import com.atomichabits.tracker.update.UpdateChecker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -59,6 +63,11 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: () -> Unit) {
     var testing by remember { mutableStateOf(false) }
     var restoring by remember { mutableStateOf(false) }
     var showRestoreConfirm by remember { mutableStateOf(false) }
+
+    var checkingUpdate by remember { mutableStateOf(false) }
+    var downloadingUpdate by remember { mutableStateOf(false) }
+    var updateResult by remember { mutableStateOf<UpdateCheckResult?>(null) }
+    var updateMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         app.settingsStore.sheetsUrl.collect { sheetsUrl = it }
@@ -164,6 +173,80 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: () -> Unit) {
                         else "\u26A0\uFE0F " + stringResource(R.string.settings_notifications_permission),
                         modifier = Modifier.padding(16.dp)
                     )
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(stringResource(R.string.settings_updates_section), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.settings_updates_current, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+
+                Button(
+                    onClick = {
+                        checkingUpdate = true
+                        updateMessage = null
+                        updateResult = null
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                UpdateChecker.check(BuildConfig.VERSION_CODE)
+                            }
+                            updateResult = result
+                            updateMessage = when (result) {
+                                is UpdateCheckResult.UpToDate -> context.getString(R.string.settings_updates_uptodate)
+                                is UpdateCheckResult.Failed -> context.getString(R.string.settings_updates_error)
+                                is UpdateCheckResult.UpdateAvailable -> context.getString(
+                                    R.string.settings_updates_available,
+                                    result.release.releaseName
+                                )
+                            }
+                            checkingUpdate = false
+                        }
+                    },
+                    enabled = !checkingUpdate && !downloadingUpdate,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.settings_updates_check))
+                }
+
+                updateMessage?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium)
+                }
+
+                val available = (updateResult as? UpdateCheckResult.UpdateAvailable)?.release
+                if (available != null) {
+                    Button(
+                        onClick = {
+                            if (!ApkInstaller.canRequestInstalls(context)) {
+                                updateMessage = context.getString(R.string.settings_updates_grant_permission)
+                                ApkInstaller.requestInstallPermission(context)
+                                return@Button
+                            }
+                            downloadingUpdate = true
+                            scope.launch {
+                                val file = withContext(Dispatchers.IO) {
+                                    ApkInstaller.download(context, available.downloadUrl)
+                                }
+                                downloadingUpdate = false
+                                if (file != null) {
+                                    ApkInstaller.install(context, file)
+                                } else {
+                                    updateMessage = context.getString(R.string.settings_updates_error)
+                                }
+                            }
+                        },
+                        enabled = !downloadingUpdate,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            stringResource(
+                                if (downloadingUpdate) R.string.settings_updates_downloading
+                                else R.string.settings_updates_install
+                            )
+                        )
+                    }
                 }
             }
         }

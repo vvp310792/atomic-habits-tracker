@@ -13,8 +13,11 @@ android {
         applicationId = "com.atomichabits.tracker"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        // CI passes -PappVersionCode=<github.run_number>, so each build has a
+        // unique, increasing version the in-app updater can compare against.
+        // Falls back to 1 for plain local builds where that property isn't set.
+        versionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 1
+        versionName = "1.0.${versionCode}"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -45,6 +48,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {

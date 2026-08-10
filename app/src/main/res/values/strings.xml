@@ -55,6 +55,17 @@
     <string name="settings_notifications_section">Уведомления</string>
     <string name="settings_notifications_permission">Разрешить уведомления</string>
 
+    <!-- Updates -->
+    <string name="settings_updates_section">Обновления</string>
+    <string name="settings_updates_current">Установлена версия %1$s (build %2$d)</string>
+    <string name="settings_updates_check">Проверить обновления</string>
+    <string name="settings_updates_uptodate">У вас последняя версия</string>
+    <string name="settings_updates_available">Доступно обновление: %1$s</string>
+    <string name="settings_updates_error">Не удалось проверить обновления. Проверьте подключение</string>
+    <string name="settings_updates_install">Скачать и установить</string>
+    <string name="settings_updates_downloading">Скачивание…</string>
+    <string name="settings_updates_grant_permission">Разрешите установку из этого источника, затем нажмите ещё раз</string>
+
     <!-- Notifications -->
     <string name="notif_channel_name">Напоминания о привычках</string>
     <string name="notif_channel_desc">Ежедневные напоминания для выполнения привычек</string>
