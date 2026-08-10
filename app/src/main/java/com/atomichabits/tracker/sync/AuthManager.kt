@@ -18,11 +18,13 @@ import java.security.MessageDigest
 import java.util.UUID
 
 /**
- * Handles "Sign in with Google" via the modern Credential Manager API, then
- * exchanges the resulting Google ID token for a Firebase Auth session. Once
- * signed in, [FirebaseAuth.getInstance().currentUser?.uid] is what all
- * Firestore data is scoped under (see firestore.rules) - it's tied to the
- * user's actual Google account, so it's the same after any reinstall, no
+ * Handles two sign-in methods, both backed by the same Firebase Auth session:
+ * - "Sign in with Google" via the modern Credential Manager API
+ * - Email/password (sign up + sign in + password reset)
+ *
+ * Whichever method is used, [FirebaseAuth.getInstance().currentUser?.uid] is
+ * what all Firestore data is scoped under (see firestore.rules) - it's tied
+ * to the user's actual account, so it's the same after any reinstall, no
  * URL or code to remember.
  */
 class AuthManager(private val webClientId: String) {
@@ -45,7 +47,7 @@ class AuthManager(private val webClientId: String) {
      * context (Credential Manager needs one to host its UI) - pass MainActivity,
      * not the Application context.
      */
-    suspend fun signIn(context: Context): Result<FirebaseUser> {
+    suspend fun signInWithGoogle(context: Context): Result<FirebaseUser> {
         return try {
             val hashedNonce = generateHashedNonce()
 
@@ -76,6 +78,36 @@ class AuthManager(private val webClientId: String) {
             }
         } catch (e: GetCredentialException) {
             Result.failure(e)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** Creates a new account with [email]/[password] (Firebase requires the password to be 6+ characters). */
+    suspend fun signUpWithEmail(email: String, password: String): Result<FirebaseUser> {
+        return try {
+            val result = auth.createUserWithEmailAndPassword(email, password).await()
+            val user = result.user
+            if (user != null) Result.success(user) else Result.failure(IllegalStateException("No user after sign-up"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun signInWithEmail(email: String, password: String): Result<FirebaseUser> {
+        return try {
+            val result = auth.signInWithEmailAndPassword(email, password).await()
+            val user = result.user
+            if (user != null) Result.success(user) else Result.failure(IllegalStateException("No user after sign-in"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun sendPasswordReset(email: String): Result<Unit> {
+        return try {
+            auth.sendPasswordResetEmail(email).await()
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }

@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -13,14 +14,18 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.atomichabits.tracker.BuildConfig
@@ -50,10 +57,12 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     var currentUserEmail by remember { mutableStateOf(app.authManager.currentUser?.email) }
-    var signingIn by remember { mutableStateOf(false) }
+    var authBusy by remember { mutableStateOf(false) }
     var authMessage by remember { mutableStateOf<String?>(null) }
+    var emailInput by remember { mutableStateOf("") }
+    var passwordInput by remember { mutableStateOf("") }
 
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    LaunchedEffect(Unit) {
         app.authManager.authStateFlow().collectLatest { user ->
             currentUserEmail = user?.email
         }
@@ -67,6 +76,18 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: () -> Unit) {
     val notificationsGranted = Build.VERSION.SDK_INT < 33 ||
         ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
         PackageManager.PERMISSION_GRANTED
+
+    fun runAuth(action: suspend () -> Result<*>) {
+        authBusy = true
+        authMessage = null
+        scope.launch {
+            val result = action()
+            authBusy = false
+            authMessage = result.exceptionOrNull()?.let {
+                it.message ?: context.getString(R.string.settings_account_error)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -108,23 +129,91 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: () -> Unit) {
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
-                    Button(
+
+                    OutlinedTextField(
+                        value = emailInput,
+                        onValueChange = { emailInput = it },
+                        label = { Text(stringResource(R.string.settings_account_email_label)) },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Email),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = { passwordInput = it },
+                        label = { Text(stringResource(R.string.settings_account_password_label)) },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                runAuth { app.authManager.signInWithEmail(emailInput.trim(), passwordInput) }
+                            },
+                            enabled = !authBusy && emailInput.isNotBlank() && passwordInput.isNotBlank(),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.settings_account_email_sign_in))
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                runAuth { app.authManager.signUpWithEmail(emailInput.trim(), passwordInput) }
+                            },
+                            enabled = !authBusy && emailInput.isNotBlank() && passwordInput.isNotBlank(),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.settings_account_email_sign_up))
+                        }
+                    }
+
+                    TextButton(
                         onClick = {
-                            signingIn = true
+                            if (emailInput.isBlank()) return@TextButton
+                            authBusy = true
                             authMessage = null
                             scope.launch {
-                                val result = app.authManager.signIn(context)
-                                signingIn = false
-                                authMessage = result.exceptionOrNull()?.let {
-                                    context.getString(R.string.settings_account_error)
+                                val result = app.authManager.sendPasswordReset(emailInput.trim())
+                                authBusy = false
+                                authMessage = if (result.isSuccess) {
+                                    context.getString(R.string.settings_account_reset_sent)
+                                } else {
+                                    result.exceptionOrNull()?.message ?: context.getString(R.string.settings_account_error)
                                 }
                             }
                         },
-                        enabled = !signingIn,
+                        enabled = !authBusy && emailInput.isNotBlank()
+                    ) {
+                        Text(stringResource(R.string.settings_account_forgot_password))
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                    ) {
+                        HorizontalDivider(modifier = Modifier.weight(1f))
+                        Text(
+                            stringResource(R.string.settings_account_or),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+                        HorizontalDivider(modifier = Modifier.weight(1f))
+                    }
+
+                    Button(
+                        onClick = { runAuth { app.authManager.signInWithGoogle(context) } },
+                        enabled = !authBusy,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(stringResource(R.string.settings_account_sign_in))
                     }
+
                     authMessage?.let {
                         Text(it, style = MaterialTheme.typography.bodyMedium)
                     }

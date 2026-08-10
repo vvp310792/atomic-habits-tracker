@@ -43,11 +43,18 @@
     <!-- Settings -->
     <string name="settings_title">Настройки</string>
     <string name="settings_account_section">Аккаунт и синхронизация</string>
-    <string name="settings_account_hint">Войдите через Google, чтобы привычки и история сохранялись в облаке и восстанавливались после переустановки приложения.</string>
+    <string name="settings_account_hint">Войдите, чтобы привычки и история сохранялись в облаке и восстанавливались после переустановки приложения.</string>
+    <string name="settings_account_email_label">Email</string>
+    <string name="settings_account_password_label">Пароль</string>
+    <string name="settings_account_email_sign_in">Войти</string>
+    <string name="settings_account_email_sign_up">Зарегистрироваться</string>
+    <string name="settings_account_forgot_password">Забыли пароль?</string>
+    <string name="settings_account_reset_sent">Письмо для сброса пароля отправлено</string>
+    <string name="settings_account_or">или</string>
     <string name="settings_account_sign_in">Войти через Google</string>
     <string name="settings_account_signed_in">Вход выполнен: %1$s</string>
     <string name="settings_account_sign_out">Выйти</string>
-    <string name="settings_account_error">Не удалось войти. Попробуйте ещё раз</string>
+    <string name="settings_account_error">Не удалось выполнить действие. Попробуйте ещё раз</string>
     <string name="settings_notifications_section">Уведомления</string>
     <string name="settings_notifications_permission">Разрешить уведомления</string>
 
