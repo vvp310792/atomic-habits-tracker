@@ -78,7 +78,10 @@ fun HabitsListScreen(
             }
     }
 
-    var addDialogType by remember { mutableStateOf<String?>(null) } // null = closed, else the type being added
+    // New-anchor dialog: holds the type being created, or null when closed.
+    var addDialogType by remember { mutableStateOf<String?>(null) }
+    // Edit-anchor dialog: holds the anchor being edited, or null when closed.
+    var editingAnchor by remember { mutableStateOf<AnchorHabit?>(null) }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.habits_title)) }) }
@@ -107,7 +110,11 @@ fun HabitsListScreen(
                 item { EmptyHint(stringResource(R.string.anchors_empty)) }
             } else {
                 items(useful, key = { "u${it.id}" }) { anchor ->
-                    AnchorRow(anchor, onDelete = { scope.launch { app.anchorRepository.archive(anchor.id) } })
+                    AnchorRow(
+                        anchor,
+                        onDelete = { scope.launch { app.anchorRepository.archive(anchor.id) } },
+                        onClick = { editingAnchor = anchor }
+                    )
                     Spacer(Modifier.size(8.dp))
                 }
             }
@@ -123,7 +130,8 @@ fun HabitsListScreen(
                     AnchorRow(
                         anchor,
                         onDelete = { scope.launch { app.anchorRepository.archive(anchor.id) } },
-                        onStart = { onStartDesired(anchor.name) }
+                        onStart = { onStartDesired(anchor.name) },
+                        onClick = { editingAnchor = anchor }
                     )
                     Spacer(Modifier.size(8.dp))
                 }
@@ -140,7 +148,8 @@ fun HabitsListScreen(
                     AnchorRow(
                         anchor,
                         onDelete = { scope.launch { app.anchorRepository.archive(anchor.id) } },
-                        impulseScore = impulseScoreByAnchor[anchor.syncId]
+                        impulseScore = impulseScoreByAnchor[anchor.syncId],
+                        onClick = { editingAnchor = anchor }
                     )
                     Spacer(Modifier.size(8.dp))
                 }
@@ -150,15 +159,39 @@ fun HabitsListScreen(
 
     val dialogType = addDialogType
     if (dialogType != null) {
-        AddAnchorDialog(
+        AnchorEditDialog(
+            type = dialogType,
+            existing = null,
             onDismiss = { addDialogType = null },
-            onSave = { name ->
+            onSave = { name, alternative ->
                 scope.launch {
                     app.anchorRepository.save(
-                        AnchorHabit(name = name, type = dialogType, createdAtEpochDay = LocalDate.now().toEpochDay())
+                        AnchorHabit(
+                            name = name,
+                            type = dialogType,
+                            createdAtEpochDay = LocalDate.now().toEpochDay(),
+                            alternativeSuggestion = alternative
+                        )
                     )
                 }
                 addDialogType = null
+            }
+        )
+    }
+
+    val anchorBeingEdited = editingAnchor
+    if (anchorBeingEdited != null) {
+        AnchorEditDialog(
+            type = anchorBeingEdited.type,
+            existing = anchorBeingEdited,
+            onDismiss = { editingAnchor = null },
+            onSave = { name, alternative ->
+                scope.launch {
+                    app.anchorRepository.save(
+                        anchorBeingEdited.copy(name = name, alternativeSuggestion = alternative)
+                    )
+                }
+                editingAnchor = null
             }
         )
     }
@@ -235,10 +268,14 @@ private fun TrackedHabitRow(habit: Habit, onClick: () -> Unit) {
 private fun AnchorRow(
     anchor: AnchorHabit,
     onDelete: () -> Unit,
+    onClick: () -> Unit,
     onStart: (() -> Unit)? = null,
     impulseScore: Pair<Int, Int>? = null
 ) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+    Card(
+        modifier = Modifier.clickable { onClick() },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -248,6 +285,13 @@ private fun AnchorRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(anchor.name, style = MaterialTheme.typography.bodyLarge)
+                if (anchor.alternativeSuggestion.isNotBlank()) {
+                    Text(
+                        "\uD83D\uDCA1 " + anchor.alternativeSuggestion,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
                 if (impulseScore != null) {
                     Text(
                         "\u26A1 ${impulseScore.first}:${impulseScore.second}",
@@ -270,12 +314,22 @@ private fun AnchorRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddAnchorDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
-    var name by remember { mutableStateOf("") }
+private fun AnchorEditDialog(
+    type: String,
+    existing: AnchorHabit?,
+    onDismiss: () -> Unit,
+    onSave: (String, String) -> Unit
+) {
+    var name by remember { mutableStateOf(existing?.name ?: "") }
+    var alternative by remember { mutableStateOf(existing?.alternativeSuggestion ?: "") }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(onClick = { if (name.isNotBlank()) onSave(name.trim()) }, enabled = name.isNotBlank()) {
+            TextButton(
+                onClick = { if (name.isNotBlank()) onSave(name.trim(), alternative.trim()) },
+                enabled = name.isNotBlank()
+            ) {
                 Text(stringResource(R.string.save))
             }
         },
@@ -284,13 +338,25 @@ private fun AddAnchorDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
         },
         title = { Text(stringResource(R.string.anchors_add_title)) },
         text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text(stringResource(R.string.anchors_name_label)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.anchors_name_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (type == "HARMFUL") {
+                    OutlinedTextField(
+                        value = alternative,
+                        onValueChange = { alternative = it },
+                        label = { Text(stringResource(R.string.anchors_alternative_label)) },
+                        placeholder = { Text(stringResource(R.string.anchors_alternative_hint)) },
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
         }
     )
 }

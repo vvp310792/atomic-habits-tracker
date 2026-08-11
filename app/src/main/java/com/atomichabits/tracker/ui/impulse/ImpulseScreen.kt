@@ -11,20 +11,24 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -48,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
@@ -67,8 +72,8 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
     val checks = todaysLogs.count { it.outcome == "CHECK" }
     val crosses = todaysLogs.count { it.outcome == "CROSS" }
 
-    val harmfulAnchors by app.anchorRepository.observeActive().collectAsState(initial = emptyList())
-    val harmful = harmfulAnchors.filter { it.type == "HARMFUL" }
+    val anchors by app.anchorRepository.observeActive().collectAsState(initial = emptyList())
+    val harmful = anchors.filter { it.type == "HARMFUL" }
 
     var showReflection by remember { mutableStateOf(false) }
     var selectedTags by remember { mutableStateOf(setOf<String>()) }
@@ -88,6 +93,7 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
     }
 
     val canCheck = secondsLeft <= 0
+    val linkedAlternative = harmful.find { it.syncId == linkedAnchorId }?.alternativeSuggestion.orEmpty()
 
     Scaffold(
         topBar = {
@@ -107,9 +113,10 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
                 stringResource(R.string.impulse_score, checks, crosses),
@@ -140,21 +147,24 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
                         }
                     }
 
+                    if (linkedAlternative.isNotBlank()) {
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                            Text(
+                                "\uD83D\uDCA1 " + linkedAlternative,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+
                     Text(
                         if (canCheck) stringResource(R.string.impulse_breathing_hint)
                         else stringResource(R.string.impulse_wait_hint),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
                     )
-                    BreathingCircle()
-
-                    if (!canCheck) {
-                        Text(
-                            formatTime(secondsLeft),
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
+                    BreathingCircle(secondsLeft = secondsLeft, canCheck = canCheck)
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -168,22 +178,51 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
                                 }
                             },
                             enabled = canCheck,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3DBE8B)),
-                            modifier = Modifier.weight(1f)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF3DBE8B),
+                                contentColor = Color.White,
+                                disabledContainerColor = Color(0xFF3DBE8B).copy(alpha = 0.35f),
+                                disabledContentColor = Color.White.copy(alpha = 0.7f)
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp)
                         ) {
                             Icon(Icons.Filled.Check, contentDescription = null)
-                            Text(" " + stringResource(R.string.impulse_check), modifier = Modifier.padding(start = 4.dp))
+                            Text(
+                                " " + stringResource(R.string.impulse_check),
+                                maxLines = 1,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
                         }
                         Button(
                             onClick = { showReflection = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF6461)),
-                            modifier = Modifier.weight(1f)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFEF6461),
+                                contentColor = Color.White
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp)
                         ) {
                             Icon(Icons.Filled.Close, contentDescription = null)
-                            Text(" " + stringResource(R.string.impulse_cross), modifier = Modifier.padding(start = 4.dp))
+                            Text(
+                                " " + stringResource(R.string.impulse_cross),
+                                maxLines = 1,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
                         }
                     }
                 } else {
+                    if (linkedAlternative.isNotBlank()) {
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                            Text(
+                                "\uD83D\uDCA1 " + linkedAlternative,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
                     Text(stringResource(R.string.impulse_reflection_title), style = MaterialTheme.typography.titleMedium)
 
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -248,14 +287,8 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
     }
 }
 
-private fun formatTime(seconds: Int): String {
-    val m = seconds / 60
-    val s = seconds % 60
-    return "%d:%02d".format(m, s)
-}
-
 @Composable
-private fun BreathingCircle() {
+private fun BreathingCircle(secondsLeft: Int, canCheck: Boolean) {
     val transition = rememberInfiniteTransition(label = "breathing")
     val scale by transition.animateFloat(
         initialValue = 0.55f,
@@ -269,14 +302,13 @@ private fun BreathingCircle() {
 
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
-            .padding(32.dp),
+            .size(220.dp)
+            .padding(10.dp),
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .size(180.dp)
+                .size(200.dp)
                 .background(
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                     CircleShape
@@ -284,8 +316,21 @@ private fun BreathingCircle() {
         )
         Box(
             modifier = Modifier
-                .size((180 * scale).dp)
+                .size((200 * scale).dp)
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), CircleShape)
         )
+        if (!canCheck) {
+            Text(
+                formatTime(secondsLeft),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
     }
+}
+
+private fun formatTime(seconds: Int): String {
+    val m = seconds / 60
+    val s = seconds % 60
+    return "%d:%02d".format(m, s)
 }
