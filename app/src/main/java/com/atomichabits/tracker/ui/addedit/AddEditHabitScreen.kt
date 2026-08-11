@@ -59,6 +59,7 @@ import java.time.LocalDate
 fun AddEditHabitScreen(
     app: HabitTrackerApp,
     habitId: Long?,
+    initialName: String? = null,
     onDone: () -> Unit
 ) {
     val context = LocalContext.current
@@ -66,7 +67,7 @@ fun AddEditHabitScreen(
 
     var id by remember { mutableStateOf(0L) }
     var syncId by remember { mutableStateOf(java.util.UUID.randomUUID().toString()) }
-    var name by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(initialName ?: "") }
     var emoji by remember { mutableStateOf("\u2705") }
     var category by remember { mutableStateOf("SELF_DEVELOPMENT") }
     var colorHex by remember { mutableStateOf(categoryColorHex("SELF_DEVELOPMENT")) }
@@ -89,6 +90,7 @@ fun AddEditHabitScreen(
 
     val allHabits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
     val allAnchors by app.anchorRepository.observeActive().collectAsState(initial = emptyList())
+    val stackableAnchors = allAnchors.filter { it.type != "DESIRED" }
     val stackableHabits = allHabits.filter { it.id != id }
 
     LaunchedEffect(habitId) {
@@ -306,7 +308,7 @@ fun AddEditHabitScreen(
     if (showStackPicker) {
         StackAnchorPickerDialog(
             trackedHabits = stackableHabits,
-            anchors = allAnchors,
+            anchors = stackableAnchors,
             onDismiss = { showStackPicker = false },
             onPick = { target: StackTarget? ->
                 if (target == null) {

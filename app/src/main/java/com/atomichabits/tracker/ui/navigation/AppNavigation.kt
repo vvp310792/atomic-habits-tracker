@@ -1,19 +1,28 @@
 package com.atomichabits.tracker.ui.navigation
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -23,13 +32,14 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.ui.addedit.AddEditHabitScreen
-import com.atomichabits.tracker.ui.anchors.AnchorLibraryScreen
 import com.atomichabits.tracker.ui.detail.HabitDetailScreen
 import com.atomichabits.tracker.ui.habits.HabitsListScreen
 import com.atomichabits.tracker.ui.history.HistoryScreen
 import com.atomichabits.tracker.ui.home.HomeScreen
 import com.atomichabits.tracker.ui.impulse.ImpulseScreen
 import com.atomichabits.tracker.ui.settings.SettingsScreen
+import java.net.URLDecoder
+import java.net.URLEncoder
 
 object Routes {
     const val HOME = "home"
@@ -38,19 +48,29 @@ object Routes {
     const val SETTINGS = "settings"
     const val ADD_EDIT = "add_edit"
     const val DETAIL = "detail"
-    const val ANCHORS = "anchors"
     const val IMPULSE = "impulse"
     const val ARG_HABIT_ID = "habitId"
+    const val ARG_INITIAL_NAME = "initialName"
 
-    fun addEdit(habitId: Long? = null) = "$ADD_EDIT?${ARG_HABIT_ID}=${habitId ?: -1L}"
+    fun addEdit(habitId: Long? = null, initialName: String? = null): String {
+        val encodedName = URLEncoder.encode(initialName ?: "", "UTF-8")
+        return "$ADD_EDIT?${ARG_HABIT_ID}=${habitId ?: -1L}&${ARG_INITIAL_NAME}=$encodedName"
+    }
+
     fun detail(habitId: Long) = "$DETAIL/$habitId"
 }
 
-private data class BottomTab(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+private data class BottomTab(
+    val route: String,
+    val label: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val emphasized: Boolean = false
+)
 
 private val BOTTOM_TABS = listOf(
     BottomTab(Routes.HOME, "Сегодня", Icons.Filled.Today),
     BottomTab(Routes.HABITS, "Привычки", Icons.Filled.Bolt),
+    BottomTab(Routes.IMPULSE, "Позыв", Icons.Filled.Bolt, emphasized = true),
     BottomTab(Routes.HISTORY, "История", Icons.Filled.History),
     BottomTab(Routes.SETTINGS, "Настройки", Icons.Filled.Settings)
 )
@@ -77,8 +97,26 @@ fun AppNavigation(app: HabitTrackerApp) {
                                     restoreState = true
                                 }
                             },
-                            icon = { Icon(tab.icon, contentDescription = null) },
-                            label = { Text(tab.label) }
+                            icon = {
+                                if (tab.emphasized) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .background(MaterialTheme.colorScheme.primary, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(tab.icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+                                    }
+                                } else {
+                                    Icon(tab.icon, contentDescription = null)
+                                }
+                            },
+                            label = { Text(tab.label) },
+                            colors = if (tab.emphasized) {
+                                NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
+                            } else {
+                                NavigationBarItemDefaults.colors()
+                            }
                         )
                     }
                 }
@@ -95,13 +133,12 @@ fun AppNavigation(app: HabitTrackerApp) {
                 HomeScreen(
                     app = app,
                     onAddHabit = { navController.navigate(Routes.addEdit()) },
-                    onOpenHabit = { id -> navController.navigate(Routes.detail(id)) },
-                    onOpenImpulse = { navController.navigate(Routes.IMPULSE) }
+                    onOpenHabit = { id -> navController.navigate(Routes.detail(id)) }
                 )
             }
 
             composable(Routes.IMPULSE) {
-                ImpulseScreen(app = app, onBack = { navController.popBackStack() })
+                ImpulseScreen(app = app)
             }
 
             composable(Routes.HABITS) {
@@ -109,7 +146,7 @@ fun AppNavigation(app: HabitTrackerApp) {
                     app = app,
                     onAddHabit = { navController.navigate(Routes.addEdit()) },
                     onOpenHabit = { id -> navController.navigate(Routes.detail(id)) },
-                    onOpenAnchors = { navController.navigate(Routes.ANCHORS) }
+                    onStartDesired = { name -> navController.navigate(Routes.addEdit(initialName = name)) }
                 )
             }
 
@@ -121,21 +158,26 @@ fun AppNavigation(app: HabitTrackerApp) {
                 SettingsScreen(app = app, onBack = null)
             }
 
-            composable(Routes.ANCHORS) {
-                AnchorLibraryScreen(app = app, onBack = { navController.popBackStack() })
-            }
-
             composable(
-                route = "${Routes.ADD_EDIT}?${Routes.ARG_HABIT_ID}={${Routes.ARG_HABIT_ID}}",
-                arguments = listOf(navArgument(Routes.ARG_HABIT_ID) {
-                    type = NavType.LongType
-                    defaultValue = -1L
-                })
+                route = "${Routes.ADD_EDIT}?${Routes.ARG_HABIT_ID}={${Routes.ARG_HABIT_ID}}&${Routes.ARG_INITIAL_NAME}={${Routes.ARG_INITIAL_NAME}}",
+                arguments = listOf(
+                    navArgument(Routes.ARG_HABIT_ID) {
+                        type = NavType.LongType
+                        defaultValue = -1L
+                    },
+                    navArgument(Routes.ARG_INITIAL_NAME) {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    }
+                )
             ) { entry ->
                 val habitId = entry.arguments?.getLong(Routes.ARG_HABIT_ID) ?: -1L
+                val encodedName = entry.arguments?.getString(Routes.ARG_INITIAL_NAME) ?: ""
+                val initialName = if (encodedName.isBlank()) null else URLDecoder.decode(encodedName, "UTF-8")
                 AddEditHabitScreen(
                     app = app,
                     habitId = if (habitId == -1L) null else habitId,
+                    initialName = initialName,
                     onDone = { navController.popBackStack() }
                 )
             }

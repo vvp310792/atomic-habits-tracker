@@ -30,13 +30,16 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -48,14 +51,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 private val TRIGGER_TAGS = listOf("Тревога", "Скука", "Социальное давление", "Усталость")
+private const val WAIT_SECONDS = 120
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImpulseScreen(app: HabitTrackerApp, onBack: () -> Unit) {
+fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
     val scope = rememberCoroutineScope()
     val today = remember { LocalDate.now() }
     val todaysLogs by app.impulseRepository.observeForDate(today).collectAsState(initial = emptyList())
@@ -66,14 +71,28 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: () -> Unit) {
     var selectedTags by remember { mutableStateOf(setOf<String>()) }
     var note by remember { mutableStateOf("") }
     var justLogged by remember { mutableStateOf<String?>(null) }
+    var sessionKey by remember { mutableIntStateOf(0) }
+    var secondsLeft by remember { mutableIntStateOf(WAIT_SECONDS) }
+
+    LaunchedEffect(sessionKey) {
+        secondsLeft = WAIT_SECONDS
+        while (secondsLeft > 0) {
+            delay(1000)
+            secondsLeft--
+        }
+    }
+
+    val canCheck = secondsLeft <= 0
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.impulse_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = null)
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Filled.ArrowBack, contentDescription = null)
+                        }
                     }
                 }
             )
@@ -92,88 +111,113 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: () -> Unit) {
                 style = MaterialTheme.typography.titleLarge
             )
 
-            if (!showReflection) {
-                Text(
-                    stringResource(R.string.impulse_breathing_hint),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-                BreathingCircle()
+            if (justLogged == null) {
+                if (!showReflection) {
+                    Text(
+                        if (canCheck) stringResource(R.string.impulse_breathing_hint)
+                        else stringResource(R.string.impulse_wait_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    BreathingCircle()
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
+                    if (!canCheck) {
+                        Text(
+                            formatTime(secondsLeft),
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    app.impulseRepository.logCheck()
+                                    justLogged = "CHECK"
+                                }
+                            },
+                            enabled = canCheck,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3DBE8B)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.Check, contentDescription = null)
+                            Text(" " + stringResource(R.string.impulse_check), modifier = Modifier.padding(start = 4.dp))
+                        }
+                        Button(
+                            onClick = { showReflection = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF6461)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.Close, contentDescription = null)
+                            Text(" " + stringResource(R.string.impulse_cross), modifier = Modifier.padding(start = 4.dp))
+                        }
+                    }
+                } else {
+                    Text(stringResource(R.string.impulse_reflection_title), style = MaterialTheme.typography.titleMedium)
+
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(TRIGGER_TAGS) { tag ->
+                            FilterChip(
+                                selected = tag in selectedTags,
+                                onClick = {
+                                    selectedTags = if (tag in selectedTags) selectedTags - tag else selectedTags + tag
+                                },
+                                label = { Text(tag) }
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = note,
+                        onValueChange = { note = it },
+                        label = { Text(stringResource(R.string.impulse_note_label)) },
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
                     Button(
                         onClick = {
                             scope.launch {
-                                app.impulseRepository.logCheck()
-                                justLogged = "CHECK"
+                                app.impulseRepository.logCross(selectedTags.toList(), note.trim())
+                                showReflection = false
+                                selectedTags = emptySet()
+                                note = ""
+                                justLogged = "CROSS"
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3DBE8B)),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Filled.Check, contentDescription = null)
-                        Text(" " + stringResource(R.string.impulse_check), modifier = Modifier.padding(start = 4.dp))
+                        Text(stringResource(R.string.save))
                     }
-                    Button(
-                        onClick = { showReflection = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF6461)),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Filled.Close, contentDescription = null)
-                        Text(" " + stringResource(R.string.impulse_cross), modifier = Modifier.padding(start = 4.dp))
-                    }
-                }
-
-                justLogged?.let {
-                    Text(
-                        stringResource(R.string.impulse_logged),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
                 }
             } else {
-                Text(stringResource(R.string.impulse_reflection_title), style = MaterialTheme.typography.titleMedium)
-
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(TRIGGER_TAGS) { tag ->
-                        FilterChip(
-                            selected = tag in selectedTags,
-                            onClick = {
-                                selectedTags = if (tag in selectedTags) selectedTags - tag else selectedTags + tag
-                            },
-                            label = { Text(tag) }
-                        )
-                    }
-                }
-
-                OutlinedTextField(
-                    value = note,
-                    onValueChange = { note = it },
-                    label = { Text(stringResource(R.string.impulse_note_label)) },
-                    minLines = 2,
-                    modifier = Modifier.fillMaxWidth()
+                Text(
+                    stringResource(R.string.impulse_logged),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary
                 )
-
-                Button(
+                OutlinedButton(
                     onClick = {
-                        scope.launch {
-                            app.impulseRepository.logCross(selectedTags.toList(), note.trim())
-                            showReflection = false
-                            selectedTags = emptySet()
-                            note = ""
-                            justLogged = "CROSS"
-                        }
+                        justLogged = null
+                        sessionKey++
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(stringResource(R.string.save))
+                    Text(stringResource(R.string.impulse_again))
                 }
             }
         }
     }
+}
+
+private fun formatTime(seconds: Int): String {
+    val m = seconds / 60
+    val s = seconds % 60
+    return "%d:%02d".format(m, s)
 }
 
 @Composable

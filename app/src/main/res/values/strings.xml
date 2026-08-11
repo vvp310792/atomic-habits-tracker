@@ -7,15 +7,18 @@
     <string name="home_empty">Пока нет привычек. Нажмите «+», чтобы добавить первую.</string>
     <string name="home_week_progress">Дни, завершённые на этой неделе: %1$d/%2$d</string>
     <string name="habits_title">Ваши привычки</string>
+    <string name="habits_section_tracked">Создаваемые привычки</string>
     <string name="history_title">История</string>
 
     <!-- Impulse (urge intercept) -->
     <string name="impulse_title">Позыв</string>
     <string name="impulse_score">Сегодня: %1$d:%2$d</string>
     <string name="impulse_breathing_hint">Дышите вместе с кругом, в своём темпе</string>
+    <string name="impulse_wait_hint">Дышите вместе с кругом — галочка станет доступна через 2 минуты</string>
     <string name="impulse_check">Удержался</string>
     <string name="impulse_cross">Поддался</string>
     <string name="impulse_logged">Записано!</string>
+    <string name="impulse_again">Ещё один позыв</string>
     <string name="impulse_reflection_title">Что это было?</string>
     <string name="impulse_note_label">Свободное поле (необязательно)</string>
     <string name="streak_days">%1$d дн. подряд</string>
@@ -46,10 +49,11 @@
     <!-- Anchor habit library -->
     <string name="anchors_title">Библиотека привычек</string>
     <string name="anchors_hint">Уже сложившиеся привычки — точки, к которым можно «прикрепить» новую по формуле Клира: «После X я делаю Y».</string>
-    <string name="anchors_useful">Полезные</string>
-    <string name="anchors_harmful">Вредные</string>
-    <string name="anchors_empty">Пока пусто — нажмите «+», чтобы добавить первую</string>
-    <string name="anchors_add_title">Добавить привычку</string>
+    <string name="anchors_useful">Полезные привычки</string>
+    <string name="anchors_desired">Желаемые привычки</string>
+    <string name="anchors_harmful">Вредные привычки</string>
+    <string name="anchors_empty">Пока пусто — нажмите «+»</string>
+    <string name="anchors_add_title">Добавить</string>
     <string name="anchors_name_label">Название</string>
 
     <!-- 4 laws of James Clear -->
