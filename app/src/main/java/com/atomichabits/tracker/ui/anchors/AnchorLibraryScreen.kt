@@ -123,6 +123,7 @@ fun AnchorLibraryScreen(app: HabitTrackerApp, onBack: () -> Unit) {
                 scope.launch {
                     app.anchorRepository.save(
                         AnchorHabit(
+                            syncId = java.util.UUID.randomUUID().toString(),
                             name = name,
                             type = type,
                             createdAtEpochDay = LocalDate.now().toEpochDay()

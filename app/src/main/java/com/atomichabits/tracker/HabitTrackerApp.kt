@@ -46,6 +46,10 @@ class HabitTrackerApp : Application() {
         NotificationHelper.ensureChannel(this)
 
         appScope.launch {
+            anchorRepository.healBlankSyncIds()
+        }
+
+        appScope.launch {
             authManager.authStateFlow().collect { user ->
                 if (user != null) {
                     syncManager.start(user.uid)

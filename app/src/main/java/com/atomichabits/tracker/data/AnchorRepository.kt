@@ -11,8 +11,13 @@ class AnchorRepository(
     fun observeActive(): Flow<List<AnchorHabit>> = anchorDao.observeActive()
 
     suspend fun save(anchor: AnchorHabit): Long {
-        val id = anchorDao.upsert(anchor)
-        val saved = if (anchor.id == 0L) anchor.copy(id = id) else anchor
+        val withSyncId = if (anchor.syncId.isBlank()) {
+            anchor.copy(syncId = java.util.UUID.randomUUID().toString())
+        } else {
+            anchor
+        }
+        val id = anchorDao.upsert(withSyncId)
+        val saved = if (withSyncId.id == 0L) withSyncId.copy(id = id) else withSyncId
         pushIfSignedIn(saved)
         return id
     }
@@ -20,6 +25,11 @@ class AnchorRepository(
     suspend fun archive(id: Long) {
         anchorDao.archive(id)
         anchorDao.getAllOnce().find { it.id == id }?.let { pushIfSignedIn(it.copy(archived = true)) }
+    }
+
+    /** Backfills a syncId for any anchor that ended up without one (data saved before a since-fixed bug) and pushes it. */
+    suspend fun healBlankSyncIds() {
+        anchorDao.getAllOnce().filter { it.syncId.isBlank() }.forEach { save(it) }
     }
 
     private fun pushIfSignedIn(anchor: AnchorHabit) {

@@ -93,6 +93,7 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
     }
 
     fun pushAnchor(uid: String, anchor: AnchorHabit) {
+        if (anchor.syncId.isBlank()) return // guards against a bad pre-existing local row; see AnchorRepository.save
         val data = mapOf(
             "name" to anchor.name,
             "type" to anchor.type,
