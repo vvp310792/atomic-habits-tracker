@@ -18,6 +18,9 @@ interface ImpulseLogDao {
     @Query("SELECT * FROM impulse_logs WHERE dateEpochDay BETWEEN :fromEpochDay AND :toEpochDay")
     fun observeBetween(fromEpochDay: Long, toEpochDay: Long): Flow<List<ImpulseLog>>
 
+    @Query("SELECT * FROM impulse_logs")
+    fun observeAll(): Flow<List<ImpulseLog>>
+
     @Query("SELECT * FROM impulse_logs WHERE syncId = :syncId LIMIT 1")
     suspend fun getBySyncId(syncId: String): ImpulseLog?
 

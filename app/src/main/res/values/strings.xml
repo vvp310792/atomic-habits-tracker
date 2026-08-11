@@ -13,6 +13,8 @@
     <!-- Impulse (urge intercept) -->
     <string name="impulse_title">Позыв</string>
     <string name="impulse_score">Сегодня: %1$d:%2$d</string>
+    <string name="impulse_link_hint">К какой привычке это относится? (необязательно)</string>
+    <string name="impulse_no_link">Без привязки</string>
     <string name="impulse_breathing_hint">Дышите вместе с кругом, в своём темпе</string>
     <string name="impulse_wait_hint">Дышите вместе с кругом — галочка станет доступна через 2 минуты</string>
     <string name="impulse_check">Удержался</string>

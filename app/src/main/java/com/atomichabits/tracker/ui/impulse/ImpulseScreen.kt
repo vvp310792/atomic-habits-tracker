@@ -67,12 +67,17 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
     val checks = todaysLogs.count { it.outcome == "CHECK" }
     val crosses = todaysLogs.count { it.outcome == "CROSS" }
 
+    val harmfulAnchors by app.anchorRepository.observeActive().collectAsState(initial = emptyList())
+    val harmful = harmfulAnchors.filter { it.type == "HARMFUL" }
+
     var showReflection by remember { mutableStateOf(false) }
     var selectedTags by remember { mutableStateOf(setOf<String>()) }
     var note by remember { mutableStateOf("") }
     var justLogged by remember { mutableStateOf<String?>(null) }
     var sessionKey by remember { mutableIntStateOf(0) }
     var secondsLeft by remember { mutableIntStateOf(WAIT_SECONDS) }
+    var linkedAnchorId by remember { mutableStateOf("") }
+    var linkedAnchorLabel by remember { mutableStateOf("") }
 
     LaunchedEffect(sessionKey) {
         secondsLeft = WAIT_SECONDS
@@ -114,6 +119,28 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
             if (justLogged == null) {
                 if (!showReflection) {
                     Text(
+                        stringResource(R.string.impulse_link_hint),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item {
+                            FilterChip(
+                                selected = linkedAnchorId.isEmpty(),
+                                onClick = { linkedAnchorId = ""; linkedAnchorLabel = "" },
+                                label = { Text(stringResource(R.string.impulse_no_link)) }
+                            )
+                        }
+                        items(harmful) { anchor ->
+                            FilterChip(
+                                selected = linkedAnchorId == anchor.syncId,
+                                onClick = { linkedAnchorId = anchor.syncId; linkedAnchorLabel = anchor.name },
+                                label = { Text(anchor.name) }
+                            )
+                        }
+                    }
+
+                    Text(
                         if (canCheck) stringResource(R.string.impulse_breathing_hint)
                         else stringResource(R.string.impulse_wait_hint),
                         style = MaterialTheme.typography.bodyMedium,
@@ -136,7 +163,7 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
                         Button(
                             onClick = {
                                 scope.launch {
-                                    app.impulseRepository.logCheck()
+                                    app.impulseRepository.logCheck(linkedAnchorId, linkedAnchorLabel)
                                     justLogged = "CHECK"
                                 }
                             },
@@ -182,7 +209,12 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
                     Button(
                         onClick = {
                             scope.launch {
-                                app.impulseRepository.logCross(selectedTags.toList(), note.trim())
+                                app.impulseRepository.logCross(
+                                    selectedTags.toList(),
+                                    note.trim(),
+                                    linkedAnchorId,
+                                    linkedAnchorLabel
+                                )
                                 showReflection = false
                                 selectedTags = emptySet()
                                 note = ""
@@ -203,6 +235,8 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
                 OutlinedButton(
                     onClick = {
                         justLogged = null
+                        linkedAnchorId = ""
+                        linkedAnchorLabel = ""
                         sessionKey++
                     },
                     modifier = Modifier.fillMaxWidth()

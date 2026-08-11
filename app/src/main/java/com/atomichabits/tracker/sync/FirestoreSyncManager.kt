@@ -136,7 +136,9 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
             "timestampMillis" to log.timestampMillis,
             "outcome" to log.outcome,
             "triggerTags" to log.triggerTags,
-            "note" to log.note
+            "note" to log.note,
+            "linkedHarmfulAnchorId" to log.linkedHarmfulAnchorId,
+            "linkedHarmfulAnchorLabel" to log.linkedHarmfulAnchorLabel
         )
         impulsesRef(uid).document(log.syncId).set(data, SetOptions.merge())
     }
@@ -266,7 +268,9 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
                     timestampMillis = doc.getLong("timestampMillis") ?: System.currentTimeMillis(),
                     outcome = doc.getString("outcome") ?: "CHECK",
                     triggerTags = doc.getString("triggerTags") ?: "",
-                    note = doc.getString("note") ?: ""
+                    note = doc.getString("note") ?: "",
+                    linkedHarmfulAnchorId = doc.getString("linkedHarmfulAnchorId") ?: "",
+                    linkedHarmfulAnchorLabel = doc.getString("linkedHarmfulAnchorLabel") ?: ""
                 )
             )
         }

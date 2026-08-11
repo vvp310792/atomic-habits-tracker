@@ -15,17 +15,33 @@ class ImpulseRepository(
     fun observeBetween(from: LocalDate, to: LocalDate): Flow<List<ImpulseLog>> =
         dao.observeBetween(from.toEpochDay(), to.toEpochDay())
 
-    suspend fun logCheck() {
-        save(ImpulseLog(outcome = "CHECK", dateEpochDay = LocalDate.now().toEpochDay()))
+    fun observeAll(): Flow<List<ImpulseLog>> = dao.observeAll()
+
+    suspend fun logCheck(linkedAnchorId: String = "", linkedAnchorLabel: String = "") {
+        save(
+            ImpulseLog(
+                outcome = "CHECK",
+                dateEpochDay = LocalDate.now().toEpochDay(),
+                linkedHarmfulAnchorId = linkedAnchorId,
+                linkedHarmfulAnchorLabel = linkedAnchorLabel
+            )
+        )
     }
 
-    suspend fun logCross(triggerTags: List<String>, note: String) {
+    suspend fun logCross(
+        triggerTags: List<String>,
+        note: String,
+        linkedAnchorId: String = "",
+        linkedAnchorLabel: String = ""
+    ) {
         save(
             ImpulseLog(
                 outcome = "CROSS",
                 dateEpochDay = LocalDate.now().toEpochDay(),
                 triggerTags = triggerTags.joinToString(","),
-                note = note
+                note = note,
+                linkedHarmfulAnchorId = linkedAnchorId,
+                linkedHarmfulAnchorLabel = linkedAnchorLabel
             )
         )
     }

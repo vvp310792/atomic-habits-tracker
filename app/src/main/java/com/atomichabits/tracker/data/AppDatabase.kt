@@ -10,7 +10,7 @@ import java.util.UUID
 
 @Database(
     entities = [Habit::class, HabitLog::class, AnchorHabit::class, ImpulseLog::class],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -116,6 +116,14 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v6 -> v7: adds optional link from an impulse log to a specific harmful anchor habit. */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE impulse_logs ADD COLUMN linkedHarmfulAnchorId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE impulse_logs ADD COLUMN linkedHarmfulAnchorLabel TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -123,7 +131,9 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "atomic_habits.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(
+                        MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7
+                    )
                     .build()
                 INSTANCE = instance
                 instance

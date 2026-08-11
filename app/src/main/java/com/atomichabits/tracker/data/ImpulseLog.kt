@@ -10,6 +10,12 @@ import androidx.room.PrimaryKey
  * CROSS doesn't feel like "the day is ruined" (the "what the hell effect" from
  * relapse-prevention research). [triggerTags]/[note] are only filled in for CROSS,
  * as a short, low-friction reflection rather than a shame-inducing confession.
+ *
+ * [linkedHarmfulAnchorId]/[linkedHarmfulAnchorLabel] optionally tie the event to a
+ * specific harmful [AnchorHabit] from the library, so per-habit check/cross stats
+ * can be shown (e.g. "vending machine: 8:2"). Both blank means an unlinked,
+ * spontaneous urge - linking is opt-in, never required, since forcing a pick would
+ * add friction exactly where speed matters most.
  */
 @Entity(tableName = "impulse_logs", indices = [Index(value = ["syncId"], unique = true)])
 data class ImpulseLog(
@@ -19,5 +25,7 @@ data class ImpulseLog(
     val timestampMillis: Long = System.currentTimeMillis(),
     val outcome: String = "CHECK", // "CHECK" | "CROSS"
     val triggerTags: String = "", // comma-separated, e.g. "Тревога,Скука"
-    val note: String = ""
+    val note: String = "",
+    val linkedHarmfulAnchorId: String = "",
+    val linkedHarmfulAnchorLabel: String = ""
 )

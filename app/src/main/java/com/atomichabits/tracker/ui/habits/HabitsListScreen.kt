@@ -62,11 +62,21 @@ fun HabitsListScreen(
 ) {
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
     val anchors by app.anchorRepository.observeActive().collectAsState(initial = emptyList())
+    val impulseLogs by app.impulseRepository.observeAll().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     val useful = anchors.filter { it.type == "USEFUL" }
     val desired = anchors.filter { it.type == "DESIRED" }
     val harmful = anchors.filter { it.type == "HARMFUL" }
+
+    val impulseScoreByAnchor = remember(impulseLogs) {
+        impulseLogs
+            .filter { it.linkedHarmfulAnchorId.isNotBlank() }
+            .groupBy { it.linkedHarmfulAnchorId }
+            .mapValues { (_, logs) ->
+                logs.count { it.outcome == "CHECK" } to logs.count { it.outcome == "CROSS" }
+            }
+    }
 
     var addDialogType by remember { mutableStateOf<String?>(null) } // null = closed, else the type being added
 
@@ -127,7 +137,11 @@ fun HabitsListScreen(
                 item { EmptyHint(stringResource(R.string.anchors_empty)) }
             } else {
                 items(harmful, key = { "hm${it.id}" }) { anchor ->
-                    AnchorRow(anchor, onDelete = { scope.launch { app.anchorRepository.archive(anchor.id) } })
+                    AnchorRow(
+                        anchor,
+                        onDelete = { scope.launch { app.anchorRepository.archive(anchor.id) } },
+                        impulseScore = impulseScoreByAnchor[anchor.syncId]
+                    )
                     Spacer(Modifier.size(8.dp))
                 }
             }
@@ -218,7 +232,12 @@ private fun TrackedHabitRow(habit: Habit, onClick: () -> Unit) {
 }
 
 @Composable
-private fun AnchorRow(anchor: AnchorHabit, onDelete: () -> Unit, onStart: (() -> Unit)? = null) {
+private fun AnchorRow(
+    anchor: AnchorHabit,
+    onDelete: () -> Unit,
+    onStart: (() -> Unit)? = null,
+    impulseScore: Pair<Int, Int>? = null
+) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Row(
             modifier = Modifier
@@ -227,7 +246,16 @@ private fun AnchorRow(anchor: AnchorHabit, onDelete: () -> Unit, onStart: (() ->
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(anchor.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(anchor.name, style = MaterialTheme.typography.bodyLarge)
+                if (impulseScore != null) {
+                    Text(
+                        "\u26A1 ${impulseScore.first}:${impulseScore.second}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
             if (onStart != null) {
                 IconButton(onClick = onStart) {
                     Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
