@@ -113,9 +113,9 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.8.4")
 
     // Room (local database - the on-device cache; Firestore is the cloud source of truth)
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
+    implementation("androidx.room:room-runtime:2.8.4")
+    implementation("androidx.room:room-ktx:2.8.4")
+    ksp("androidx.room:room-compiler:2.8.4")
 
     // Coroutines (used directly in BroadcastReceivers for background DB work)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
