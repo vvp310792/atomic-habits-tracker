@@ -81,7 +81,7 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
     var justLogged by remember { mutableStateOf<String?>(null) }
     var sessionKey by remember { mutableIntStateOf(0) }
     var secondsLeft by remember { mutableIntStateOf(WAIT_SECONDS) }
-    var linkedAnchorId by remember { mutableStateOf("") }
+    var linkedAnchorId by remember { mutableStateOf<String?>(null) } // null = not yet chosen
     var linkedAnchorLabel by remember { mutableStateOf("") }
 
     LaunchedEffect(sessionKey) {
@@ -92,7 +92,7 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
         }
     }
 
-    val canCheck = secondsLeft <= 0
+    val canCheck = secondsLeft <= 0 && linkedAnchorId != null
     val linkedAlternative = harmful.find { it.syncId == linkedAnchorId }?.alternativeSuggestion.orEmpty()
 
     Scaffold(
@@ -126,23 +126,25 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
             if (justLogged == null) {
                 if (!showReflection) {
                     Text(
-                        stringResource(R.string.impulse_link_hint),
+                        if (linkedAnchorId == null) stringResource(R.string.impulse_link_hint_required)
+                        else stringResource(R.string.impulse_link_hint),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = if (linkedAnchorId == null) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item {
-                            FilterChip(
-                                selected = linkedAnchorId.isEmpty(),
-                                onClick = { linkedAnchorId = ""; linkedAnchorLabel = "" },
-                                label = { Text(stringResource(R.string.impulse_no_link)) }
-                            )
-                        }
                         items(harmful) { anchor ->
                             FilterChip(
                                 selected = linkedAnchorId == anchor.syncId,
                                 onClick = { linkedAnchorId = anchor.syncId; linkedAnchorLabel = anchor.name },
                                 label = { Text(anchor.name) }
+                            )
+                        }
+                        item {
+                            FilterChip(
+                                selected = linkedAnchorId == "",
+                                onClick = { linkedAnchorId = ""; linkedAnchorLabel = "" },
+                                label = { Text(stringResource(R.string.impulse_no_link)) }
                             )
                         }
                     }
@@ -173,7 +175,7 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
                         Button(
                             onClick = {
                                 scope.launch {
-                                    app.impulseRepository.logCheck(linkedAnchorId, linkedAnchorLabel)
+                                    app.impulseRepository.logCheck(linkedAnchorId.orEmpty(), linkedAnchorLabel)
                                     justLogged = "CHECK"
                                 }
                             },
@@ -251,7 +253,7 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
                                 app.impulseRepository.logCross(
                                     selectedTags.toList(),
                                     note.trim(),
-                                    linkedAnchorId,
+                                    linkedAnchorId.orEmpty(),
                                     linkedAnchorLabel
                                 )
                                 showReflection = false
@@ -274,7 +276,7 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
                 OutlinedButton(
                     onClick = {
                         justLogged = null
-                        linkedAnchorId = ""
+                        linkedAnchorId = null
                         linkedAnchorLabel = ""
                         sessionKey++
                     },

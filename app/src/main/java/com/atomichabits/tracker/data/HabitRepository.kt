@@ -20,6 +20,8 @@ class HabitRepository(
     fun observeLogsBetween(from: LocalDate, to: LocalDate): Flow<List<HabitLog>> =
         habitLogDao.observeLogsBetween(from.toEpochDay(), to.toEpochDay())
 
+    fun observeAllLogs(): Flow<List<HabitLog>> = habitLogDao.observeAllLogs()
+
     fun observeLogsForHabit(habitId: Long): Flow<List<HabitLog>> =
         habitLogDao.observeLogsForHabit(habitId)
 
@@ -35,6 +37,17 @@ class HabitRepository(
     suspend fun archiveHabit(habitId: Long) {
         habitDao.archive(habitId)
         habitDao.getHabit(habitId)?.let { pushHabitIfSignedIn(it) }
+    }
+
+    /** Persists a new manual order for tracked habits (drag-to-reorder on the Habits screen). */
+    suspend fun reorder(orderedHabitIds: List<Long>) {
+        orderedHabitIds.forEachIndexed { index, id ->
+            habitDao.updateSortOrder(id, index)
+        }
+        val uid = currentUid()
+        if (uid != null && syncManager != null) {
+            orderedHabitIds.forEach { id -> habitDao.getHabit(id)?.let { pushHabitIfSignedIn(it) } }
+        }
     }
 
     suspend fun deleteHabit(habit: Habit) = habitDao.delete(habit)

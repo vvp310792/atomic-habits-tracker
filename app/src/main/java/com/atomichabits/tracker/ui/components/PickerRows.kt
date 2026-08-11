@@ -22,7 +22,9 @@ import com.atomichabits.tracker.ui.theme.HabitColorPresets
 private val COMMON_EMOJIS = listOf(
     "\u2705", "\uD83D\uDCAA", "\uD83D\uDCDA", "\uD83E\uDDD8", "\uD83D\uDCA7",
     "\uD83C\uDFC3", "\uD83E\uDE7A", "\uD83C\uDF6E", "\uD83D\uDCA4", "\uD83D\uDCDD",
-    "\uD83E\uDDF9", "\uD83C\uDFA8", "\uD83D\uDCB0", "\uD83E\uDDD0", "\uD83C\uDFB5"
+    "\uD83E\uDDF9", "\uD83C\uDFA8", "\uD83D\uDCB0", "\uD83E\uDDD0", "\uD83C\uDFB5",
+    "\uD83D\uDC6A", "\uD83D\uDC6B", "\uD83D\uDC76", "\u2764\uFE0F", "\uD83D\uDCDE",
+    "\uD83D\uDCAC", "\uD83E\uDD1D", "\uD83C\uDF89", "\u2615", "\uD83D\uDC65"
 )
 
 @Composable

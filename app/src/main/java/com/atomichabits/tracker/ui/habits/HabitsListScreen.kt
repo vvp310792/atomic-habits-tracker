@@ -2,6 +2,7 @@ package com.atomichabits.tracker.ui.habits
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,15 +35,20 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.AnchorHabit
@@ -51,6 +57,7 @@ import com.atomichabits.tracker.ui.components.CategoryTag
 import com.atomichabits.tracker.util.timeOfDayLabel
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,9 +103,20 @@ fun HabitsListScreen(
             if (habits.isEmpty()) {
                 item { EmptyHint(stringResource(R.string.home_empty)) }
             } else {
-                items(habits, key = { "h${it.id}" }) { habit ->
-                    TrackedHabitRow(habit) { onOpenHabit(habit.id) }
-                    Spacer(Modifier.size(8.dp))
+                item {
+                    Text(
+                        stringResource(R.string.habits_reorder_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                }
+                item {
+                    ReorderableTrackedHabits(
+                        habits = habits,
+                        onOpenHabit = onOpenHabit,
+                        onReorder = { orderedIds -> scope.launch { app.repository.reorder(orderedIds) } }
+                    )
                 }
             }
 
@@ -198,6 +216,58 @@ fun HabitsListScreen(
 }
 
 @Composable
+private fun ReorderableTrackedHabits(
+    habits: List<Habit>,
+    onOpenHabit: (Long) -> Unit,
+    onReorder: (List<Long>) -> Unit
+) {
+    var items by remember(habits.map { it.id }) { mutableStateOf(habits) }
+    var draggingId by remember { mutableStateOf<Long?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val rowHeightPx = with(density) { 68.dp.toPx() }
+
+    Column {
+        items.forEachIndexed { _, habit ->
+            val isDragging = habit.id == draggingId
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .zIndex(if (isDragging) 1f else 0f)
+                    .graphicsLayer { translationY = if (isDragging) dragOffset else 0f }
+                    .pointerInput(habit.id) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { draggingId = habit.id; dragOffset = 0f },
+                            onDragEnd = {
+                                draggingId = null
+                                dragOffset = 0f
+                                onReorder(items.map { it.id })
+                            },
+                            onDragCancel = { draggingId = null; dragOffset = 0f },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                dragOffset += dragAmount.y
+                                val currentIndex = items.indexOfFirst { it.id == habit.id }
+                                val shift = (dragOffset / rowHeightPx).roundToInt()
+                                val targetIndex = (currentIndex + shift).coerceIn(0, items.size - 1)
+                                if (targetIndex != currentIndex) {
+                                    items = items.toMutableList().apply {
+                                        add(targetIndex, removeAt(currentIndex))
+                                    }
+                                    dragOffset -= (targetIndex - currentIndex) * rowHeightPx
+                                }
+                            }
+                        )
+                    }
+            ) {
+                TrackedHabitRow(habit, isDragging) { onOpenHabit(habit.id) }
+            }
+            Spacer(Modifier.size(8.dp))
+        }
+    }
+}
+
+@Composable
 private fun SectionTitle(title: String, onAdd: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -222,7 +292,7 @@ private fun EmptyHint(text: String) {
 }
 
 @Composable
-private fun TrackedHabitRow(habit: Habit, onClick: () -> Unit) {
+private fun TrackedHabitRow(habit: Habit, isDragging: Boolean = false, onClick: () -> Unit) {
     val accent = remember(habit.colorHex) {
         runCatching { Color(android.graphics.Color.parseColor(habit.colorHex)) }
             .getOrDefault(Color(0xFF7C6CF0))
@@ -231,7 +301,10 @@ private fun TrackedHabitRow(habit: Habit, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isDragging) 8.dp else 0.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDragging) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
+        )
     ) {
         Row(
             modifier = Modifier

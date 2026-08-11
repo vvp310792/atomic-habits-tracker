@@ -8,12 +8,27 @@
     <string name="home_week_progress">Дни, завершённые на этой неделе: %1$d/%2$d</string>
     <string name="habits_title">Ваши привычки</string>
     <string name="habits_section_tracked">Создаваемые привычки</string>
+    <string name="habits_reorder_hint">Зажмите карточку и перетащите, чтобы изменить порядок</string>
     <string name="history_title">История</string>
+    <string name="history_tab_calendar">Календарь</string>
+    <string name="history_tab_habits">Все привычки</string>
+    <string name="history_tab_achievements">Достижения</string>
+    <string name="history_stat_streak">Текущая серия</string>
+    <string name="history_stat_best_streak">Лучшая серия успехов: %1$d</string>
+    <string name="history_stat_total_completions">Привычка завершена</string>
+    <string name="history_stat_this_week">Эта неделя: %1$d</string>
+    <string name="history_stat_completion_rate">Доля завершённых</string>
+    <string name="history_stat_habits_fraction">Привычки: %1$d/%2$d</string>
+    <string name="history_stat_perfect_days">Идеальные дни</string>
+    <string name="history_statistics_title">Статистика</string>
+    <string name="history_avg_completion">Сред. доля завершённых</string>
+    <string name="history_habit_total">Всего выполнено: %1$d</string>
 
     <!-- Impulse (urge intercept) -->
     <string name="impulse_title">Позыв</string>
     <string name="impulse_score">Сегодня: %1$d:%2$d</string>
     <string name="impulse_link_hint">К какой привычке это относится? (необязательно)</string>
+    <string name="impulse_link_hint_required">Выберите тег — хотя бы «Без привязки», чтобы продолжить</string>
     <string name="impulse_no_link">Без привязки</string>
     <string name="impulse_breathing_hint">Дышите вместе с кругом, в своём темпе</string>
     <string name="impulse_wait_hint">Дышите вместе с кругом — галочка станет доступна через 2 минуты</string>

@@ -103,6 +103,22 @@ fun HabitCard(
                 }
                 Spacer(Modifier.size(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
+                    if (completedToday) {
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .background(Color(0xFF22C55E), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                        Spacer(Modifier.size(2.dp))
+                    }
                     Text(
                         habit.name,
                         style = MaterialTheme.typography.bodyLarge,

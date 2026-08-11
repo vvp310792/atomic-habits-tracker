@@ -94,6 +94,7 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
             "createdAtEpochDay" to habit.createdAtEpochDay,
             "archived" to habit.archived,
             "stackAnchorId" to habit.stackAnchorId,
+            "sortOrder" to habit.sortOrder,
             "stackAnchorType" to habit.stackAnchorType,
             "stackAnchorLabel" to habit.stackAnchorLabel,
             "updatedAt" to FieldValue.serverTimestamp()
@@ -189,7 +190,7 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
                 lawSatisfying = doc.getString("lawSatisfying") ?: "",
                 createdAtEpochDay = doc.getLong("createdAtEpochDay") ?: LocalDate.now().toEpochDay(),
                 archived = doc.getBoolean("archived") ?: false,
-                sortOrder = existing?.sortOrder ?: 0,
+                sortOrder = (doc.getLong("sortOrder"))?.toInt() ?: existing?.sortOrder ?: 0,
                 stackAnchorId = doc.getString("stackAnchorId") ?: "",
                 stackAnchorType = doc.getString("stackAnchorType") ?: "",
                 stackAnchorLabel = doc.getString("stackAnchorLabel") ?: ""

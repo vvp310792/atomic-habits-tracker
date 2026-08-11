@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -51,7 +50,6 @@ import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
-private const val DATE_WINDOW_DAYS = 14L // last 14 days, today included
 private val FILTERS = listOf("ALL", "MORNING", "DAY", "EVENING")
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,10 +61,13 @@ fun HomeScreen(
 ) {
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
     val today = remember { LocalDate.now() }
-    val windowStart = remember { today.minusDays(DATE_WINDOW_DAYS - 1) }
-    val days = remember { (0 until DATE_WINDOW_DAYS).map { windowStart.plusDays(it) } }
+    // Full current week Monday..Sunday, so "today" sits wherever its weekday
+    // falls rather than always being the last/rightmost item.
+    val weekMonday = remember(today) { today.minusDays((today.dayOfWeek.value - 1).toLong()) }
+    val weekSunday = remember(weekMonday) { weekMonday.plusDays(6) }
+    val days = remember(weekMonday) { (0..6).map { weekMonday.plusDays(it) } }
 
-    val windowLogs by app.repository.observeLogsBetween(windowStart, today).collectAsState(initial = emptyList())
+    val windowLogs by app.repository.observeLogsBetween(weekMonday, weekSunday).collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     var selectedDate by remember { mutableStateOf(today) }
@@ -94,8 +95,8 @@ fun HomeScreen(
     val daySection = habitsForSelectedDate.filter { it.timeOfDay == "DAY" }
     val evening = habitsForSelectedDate.filter { it.timeOfDay == "EVENING" }
 
-    // "Perfect days" so far this week (Monday..today), for the weekly counter card.
-    val weekMonday = remember(today) { today.minusDays((today.dayOfWeek.value - 1).toLong()) }
+    // "Perfect days" so far this week (Monday..today, not the whole displayed
+    // week - future days can't be "perfect" yet), for the weekly counter card.
     val weekDaysElapsed = remember(today, weekMonday) {
         (0..ChronoUnit.DAYS.between(weekMonday, today)).map { weekMonday.plusDays(it) }
     }
@@ -107,8 +108,6 @@ fun HomeScreen(
             scheduled.all { it in completed }
         }
     }
-
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = maxOf(0, days.size - 6))
 
     fun habitToggle(habit: Habit): () -> Unit = {
         scope.launch { app.repository.toggleCompletion(habit.id, selectedDate) }
@@ -134,7 +133,6 @@ fun HomeScreen(
         ) {
             item {
                 LazyRow(
-                    state = listState,
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                 ) {
