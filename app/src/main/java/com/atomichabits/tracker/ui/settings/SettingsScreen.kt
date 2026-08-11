@@ -52,7 +52,7 @@ import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(app: HabitTrackerApp, onBack: () -> Unit) {
+fun SettingsScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -94,8 +94,10 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: () -> Unit) {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = null)
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Filled.ArrowBack, contentDescription = null)
+                        }
                     }
                 }
             )

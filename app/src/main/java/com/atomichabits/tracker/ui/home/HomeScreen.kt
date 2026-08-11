@@ -1,7 +1,10 @@
 package com.atomichabits.tracker.ui.home
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -9,12 +12,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,18 +48,18 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
-private const val DATE_WINDOW_DAYS = 14L // shows the last 14 days, today included, in the date strip
+private const val DATE_WINDOW_DAYS = 14L // last 14 days, today included
+private val FILTERS = listOf("ALL", "MORNING", "DAY", "EVENING")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     app: HabitTrackerApp,
     onAddHabit: () -> Unit,
-    onOpenHabit: (Long) -> Unit,
-    onOpenSettings: () -> Unit,
-    onOpenAnchors: () -> Unit
+    onOpenHabit: (Long) -> Unit
 ) {
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
     val today = remember { LocalDate.now() }
@@ -66,8 +70,8 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
 
     var selectedDate by remember { mutableStateOf(today) }
+    var filter by remember { mutableStateOf("ALL") }
 
-    // completed/scheduled counts per date, driving how full each ring in the strip is
     val progressByDate = remember(habits, windowLogs) {
         days.associateWith { date ->
             val scheduledIds = habits.filter { isHabitScheduledOn(it.activeDays, date) }.map { it.id }.toSet()
@@ -90,28 +94,36 @@ fun HomeScreen(
     val daySection = habitsForSelectedDate.filter { it.timeOfDay == "DAY" }
     val evening = habitsForSelectedDate.filter { it.timeOfDay == "EVENING" }
 
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = maxOf(0, days.size - 6)
-    )
+    // "Perfect days" so far this week (Monday..today), for the weekly counter card.
+    val weekMonday = remember(today) { today.minusDays((today.dayOfWeek.value - 1).toLong()) }
+    val weekDaysElapsed = remember(today, weekMonday) {
+        (0..ChronoUnit.DAYS.between(weekMonday, today)).map { weekMonday.plusDays(it) }
+    }
+    val perfectDaysThisWeek = remember(habits, windowLogs, weekDaysElapsed) {
+        weekDaysElapsed.count { date ->
+            val scheduled = habits.filter { isHabitScheduledOn(it.activeDays, date) }.map { it.id }.toSet()
+            if (scheduled.isEmpty()) return@count false
+            val completed = windowLogs.filter { it.dateEpochDay == date.toEpochDay() && it.completed }.map { it.habitId }.toSet()
+            scheduled.all { it in completed }
+        }
+    }
+
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = maxOf(0, days.size - 6))
+
+    fun habitToggle(habit: Habit): () -> Unit = {
+        scope.launch { app.repository.toggleCompletion(habit.id, selectedDate) }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(headerTitle(selectedDate, today)) },
                 actions = {
-                    IconButton(onClick = onOpenAnchors) {
-                        Icon(Icons.Filled.Link, contentDescription = null)
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Filled.Settings, contentDescription = null)
+                    IconButton(onClick = onAddHabit) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
                     }
                 }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = onAddHabit) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-            }
         }
     ) { padding ->
         LazyColumn(
@@ -139,59 +151,83 @@ fun HomeScreen(
                 }
             }
 
-            fun habitToggle(habit: Habit): () -> Unit = {
-                scope.launch {
-                    app.repository.toggleCompletion(habit.id, selectedDate)
-                }
-            }
-
-            if (morning.isNotEmpty()) {
-                item { SectionHeader(timeOfDayLabel("MORNING")) }
-                items(morning, key = { "m${it.id}" }) { habit ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
-                        HabitCard(
-                            habit = habit,
-                            completedToday = habit.id in completedIdsForSelectedDate,
-                            repository = app.repository,
-                            refreshKey = habit.id in completedIdsForSelectedDate,
-                            onToggle = habitToggle(habit),
-                            onClick = { onOpenHabit(habit.id) }
-                        )
-                    }
-                }
-            }
-            if (daySection.isNotEmpty()) {
-                item { SectionHeader(timeOfDayLabel("DAY")) }
-                items(daySection, key = { "d${it.id}" }) { habit ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
-                        HabitCard(
-                            habit = habit,
-                            completedToday = habit.id in completedIdsForSelectedDate,
-                            repository = app.repository,
-                            refreshKey = habit.id in completedIdsForSelectedDate,
-                            onToggle = habitToggle(habit),
-                            onClick = { onOpenHabit(habit.id) }
-                        )
-                    }
-                }
-            }
-            if (evening.isNotEmpty()) {
-                item { SectionHeader(timeOfDayLabel("EVENING")) }
-                items(evening, key = { "e${it.id}" }) { habit ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
-                        HabitCard(
-                            habit = habit,
-                            completedToday = habit.id in completedIdsForSelectedDate,
-                            repository = app.repository,
-                            refreshKey = habit.id in completedIdsForSelectedDate,
-                            onToggle = habitToggle(habit),
-                            onClick = { onOpenHabit(habit.id) }
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FILTERS.forEach { f ->
+                        FilterChip(
+                            selected = filter == f,
+                            onClick = { filter = f },
+                            label = { Text(filterLabel(f)) }
                         )
                     }
                 }
             }
 
-            if (habitsForSelectedDate.isEmpty()) {
+            if (filter == "ALL" || filter == "MORNING") {
+                if (morning.isNotEmpty()) {
+                    item { SectionHeader(timeOfDayLabel("MORNING")) }
+                    items(morning, key = { "m${it.id}" }) { habit ->
+                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
+                            HabitCard(
+                                habit = habit,
+                                completedToday = habit.id in completedIdsForSelectedDate,
+                                repository = app.repository,
+                                refreshKey = habit.id in completedIdsForSelectedDate,
+                                onToggle = habitToggle(habit),
+                                onClick = { onOpenHabit(habit.id) }
+                            )
+                        }
+                    }
+                }
+            }
+            if (filter == "ALL" || filter == "DAY") {
+                if (daySection.isNotEmpty()) {
+                    item { SectionHeader(timeOfDayLabel("DAY")) }
+                    items(daySection, key = { "d${it.id}" }) { habit ->
+                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
+                            HabitCard(
+                                habit = habit,
+                                completedToday = habit.id in completedIdsForSelectedDate,
+                                repository = app.repository,
+                                refreshKey = habit.id in completedIdsForSelectedDate,
+                                onToggle = habitToggle(habit),
+                                onClick = { onOpenHabit(habit.id) }
+                            )
+                        }
+                    }
+                }
+            }
+            if (filter == "ALL" || filter == "EVENING") {
+                if (evening.isNotEmpty()) {
+                    item { SectionHeader(timeOfDayLabel("EVENING")) }
+                    items(evening, key = { "e${it.id}" }) { habit ->
+                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
+                            HabitCard(
+                                habit = habit,
+                                completedToday = habit.id in completedIdsForSelectedDate,
+                                repository = app.repository,
+                                refreshKey = habit.id in completedIdsForSelectedDate,
+                                onToggle = habitToggle(habit),
+                                onClick = { onOpenHabit(habit.id) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            val visibleCount = when (filter) {
+                "MORNING" -> morning.size
+                "DAY" -> daySection.size
+                "EVENING" -> evening.size
+                else -> habitsForSelectedDate.size
+            }
+            if (visibleCount == 0) {
                 item {
                     Box(
                         modifier = Modifier
@@ -207,8 +243,30 @@ fun HomeScreen(
                     }
                 }
             }
+
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Text(
+                        stringResource(R.string.home_week_progress, perfectDaysThisWeek, weekDaysElapsed.size),
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(14.dp)
+                    )
+                }
+            }
         }
     }
+}
+
+private fun filterLabel(f: String): String = when (f) {
+    "MORNING" -> "Утром"
+    "DAY" -> "Днём"
+    "EVENING" -> "Вечером"
+    else -> "Все"
 }
 
 private fun headerTitle(selectedDate: LocalDate, today: LocalDate): String {
