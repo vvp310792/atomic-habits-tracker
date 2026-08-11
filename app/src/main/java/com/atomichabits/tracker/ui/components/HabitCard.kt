@@ -102,6 +102,14 @@ fun HabitCard(
                             )
                         }
                     }
+                    if (habit.stackAnchorLabel.isNotBlank()) {
+                        Text(
+                            "\u26D3 " + stringResource(R.string.field_stack_selected, habit.stackAnchorLabel),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
                 }
             }
 

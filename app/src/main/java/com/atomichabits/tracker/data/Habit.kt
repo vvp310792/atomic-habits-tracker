@@ -29,6 +29,15 @@ import androidx.room.PrimaryKey
  * [category] tags the habit with one of 7 fixed life areas (CAREER, INTELLECT,
  * SELF_DEVELOPMENT, FINANCE, SOCIETY, HEALTH, FAMILY) - each has its own fixed
  * color (see util/Categories.kt), which is what [colorHex] is derived from.
+ *
+ * Habit stacking (Clear's "After [CURRENT HABIT], I will [NEW HABIT]"):
+ * [stackAnchorId] is the syncId of whatever this habit is chained after - either
+ * an [AnchorHabit] (an already-established routine, not itself tracked) or
+ * another tracked [Habit] (so the chain can keep growing as habits mature).
+ * [stackAnchorType] disambiguates which table [stackAnchorId] refers to:
+ * "ANCHOR" or "HABIT" ("" = not stacked onto anything). [stackAnchorLabel] is a
+ * cached copy of the anchor's display name, so the chain still reads sensibly
+ * even if the anchor is later renamed or removed.
  */
 @Entity(tableName = "habits", indices = [Index(value = ["syncId"], unique = true)])
 data class Habit(
@@ -49,5 +58,8 @@ data class Habit(
     val lawSatisfying: String = "",
     val createdAtEpochDay: Long = 0,
     val archived: Boolean = false,
-    val sortOrder: Int = 0
+    val sortOrder: Int = 0,
+    val stackAnchorId: String = "",
+    val stackAnchorType: String = "",
+    val stackAnchorLabel: String = ""
 )

@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -53,7 +54,8 @@ fun HomeScreen(
     app: HabitTrackerApp,
     onAddHabit: () -> Unit,
     onOpenHabit: (Long) -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenAnchors: () -> Unit
 ) {
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
     val today = remember { LocalDate.now() }
@@ -97,6 +99,9 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text(headerTitle(selectedDate, today)) },
                 actions = {
+                    IconButton(onClick = onOpenAnchors) {
+                        Icon(Icons.Filled.Link, contentDescription = null)
+                    }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = null)
                     }

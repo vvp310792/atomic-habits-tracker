@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.ui.addedit.AddEditHabitScreen
+import com.atomichabits.tracker.ui.anchors.AnchorLibraryScreen
 import com.atomichabits.tracker.ui.detail.HabitDetailScreen
 import com.atomichabits.tracker.ui.home.HomeScreen
 import com.atomichabits.tracker.ui.settings.SettingsScreen
@@ -17,6 +18,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val ADD_EDIT = "add_edit"
     const val DETAIL = "detail"
+    const val ANCHORS = "anchors"
     const val ARG_HABIT_ID = "habitId"
 
     fun addEdit(habitId: Long? = null) = "$ADD_EDIT?${ARG_HABIT_ID}=${habitId ?: -1L}"
@@ -34,8 +36,13 @@ fun AppNavigation(app: HabitTrackerApp) {
                 app = app,
                 onAddHabit = { navController.navigate(Routes.addEdit()) },
                 onOpenHabit = { id -> navController.navigate(Routes.detail(id)) },
-                onOpenSettings = { navController.navigate(Routes.SETTINGS) }
+                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                onOpenAnchors = { navController.navigate(Routes.ANCHORS) }
             )
+        }
+
+        composable(Routes.ANCHORS) {
+            AnchorLibraryScreen(app = app, onBack = { navController.popBackStack() })
         }
 
         composable(

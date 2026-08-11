@@ -18,9 +18,26 @@
     <string name="field_time_of_day">Время дня</string>
     <string name="field_reminder">Напоминание</string>
     <string name="field_reminder_time">Время напоминания</string>
+    <string name="field_stack">Привычка-стек</string>
+    <string name="field_stack_selected">После: %1$s</string>
     <string name="save">Сохранить</string>
     <string name="delete">Удалить</string>
     <string name="cancel">Отмена</string>
+
+    <!-- Habit stacking picker -->
+    <string name="stack_picker_title">Прикрепить к привычке</string>
+    <string name="stack_picker_none">Не привязывать</string>
+    <string name="stack_picker_habits">Мои привычки</string>
+    <string name="stack_picker_empty">Пока нет ни привычек, ни опор — добавьте в библиотеке</string>
+
+    <!-- Anchor habit library -->
+    <string name="anchors_title">Библиотека привычек</string>
+    <string name="anchors_hint">Уже сложившиеся привычки — точки, к которым можно «прикрепить» новую по формуле Клира: «После X я делаю Y».</string>
+    <string name="anchors_useful">Полезные</string>
+    <string name="anchors_harmful">Вредные</string>
+    <string name="anchors_empty">Пока пусто — нажмите «+», чтобы добавить первую</string>
+    <string name="anchors_add_title">Добавить привычку</string>
+    <string name="anchors_name_label">Название</string>
 
     <!-- 4 laws of James Clear -->
     <string name="laws_title">4 закона атомных привычек</string>

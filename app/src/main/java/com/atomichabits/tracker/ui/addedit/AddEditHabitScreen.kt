@@ -27,6 +27,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +44,8 @@ import com.atomichabits.tracker.notifications.ReminderScheduler
 import com.atomichabits.tracker.ui.components.CategoryPicker
 import com.atomichabits.tracker.ui.components.EmojiPicker
 import com.atomichabits.tracker.ui.components.LawSection
+import com.atomichabits.tracker.ui.components.StackAnchorPickerDialog
+import com.atomichabits.tracker.ui.components.StackTarget
 import com.atomichabits.tracker.ui.components.WeekdayPicker
 import com.atomichabits.tracker.util.ALL_DAYS_MASK
 import com.atomichabits.tracker.util.categoryColorHex
@@ -77,8 +80,16 @@ fun AddEditHabitScreen(
     var lawEasy by remember { mutableStateOf("") }
     var lawSatisfying by remember { mutableStateOf("") }
     var createdAtEpochDay by remember { mutableStateOf(LocalDate.now().toEpochDay()) }
+    var stackAnchorId by remember { mutableStateOf("") }
+    var stackAnchorType by remember { mutableStateOf("") }
+    var stackAnchorLabel by remember { mutableStateOf("") }
     var showTimePicker by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showStackPicker by remember { mutableStateOf(false) }
+
+    val allHabits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
+    val allAnchors by app.anchorRepository.observeActive().collectAsState(initial = emptyList())
+    val stackableHabits = allHabits.filter { it.id != id }
 
     LaunchedEffect(habitId) {
         if (habitId != null) {
@@ -99,6 +110,9 @@ fun AddEditHabitScreen(
                 lawEasy = h.lawEasy
                 lawSatisfying = h.lawSatisfying
                 createdAtEpochDay = h.createdAtEpochDay
+                stackAnchorId = h.stackAnchorId
+                stackAnchorType = h.stackAnchorType
+                stackAnchorLabel = h.stackAnchorLabel
             }
         }
     }
@@ -119,7 +133,10 @@ fun AddEditHabitScreen(
         lawAttractive = lawAttractive,
         lawEasy = lawEasy,
         lawSatisfying = lawSatisfying,
-        createdAtEpochDay = createdAtEpochDay
+        createdAtEpochDay = createdAtEpochDay,
+        stackAnchorId = stackAnchorId,
+        stackAnchorType = stackAnchorType,
+        stackAnchorLabel = stackAnchorLabel
     )
 
     Scaffold(
@@ -208,6 +225,16 @@ fun AddEditHabitScreen(
                 }
             }
 
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.field_stack), style = MaterialTheme.typography.labelLarge)
+                TextButton(onClick = { showStackPicker = true }) {
+                    Text(
+                        if (stackAnchorId.isBlank()) stringResource(R.string.stack_picker_none)
+                        else stringResource(R.string.field_stack_selected, stackAnchorLabel)
+                    )
+                }
+            }
+
             Text(stringResource(R.string.laws_title), style = MaterialTheme.typography.titleLarge)
 
             LawSection(
@@ -273,6 +300,29 @@ fun AddEditHabitScreen(
                 }
             },
             text = { TimePicker(state = timeState) }
+        )
+    }
+
+    if (showStackPicker) {
+        StackAnchorPickerDialog(
+            trackedHabits = stackableHabits,
+            anchors = allAnchors,
+            onDismiss = { showStackPicker = false },
+            onPick = { target: StackTarget? ->
+                if (target == null) {
+                    stackAnchorId = ""
+                    stackAnchorType = ""
+                    stackAnchorLabel = ""
+                } else {
+                    stackAnchorId = target.id
+                    stackAnchorType = target.type
+                    stackAnchorLabel = target.label
+                    if (lawObvious.isBlank()) {
+                        lawObvious = "После «${target.label}» я: ${name.ifBlank { "..." }}"
+                    }
+                }
+                showStackPicker = false
+            }
         )
     }
 
