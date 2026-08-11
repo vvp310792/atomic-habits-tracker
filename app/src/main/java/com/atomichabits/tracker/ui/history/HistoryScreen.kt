@@ -431,7 +431,7 @@ private fun WeekStatCard(week: WeekBucket) {
                         Box(
                             modifier = Modifier
                                 .width(8.dp)
-                                .height((if (pct <= 0) 8 else 8 + pct * 0.5).dp)
+                                .height((if (pct <= 0) 8.0 else 8.0 + pct * 0.5).dp)
                                 .background(
                                     if (pct > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
                                     RoundedCornerShape(4.dp)

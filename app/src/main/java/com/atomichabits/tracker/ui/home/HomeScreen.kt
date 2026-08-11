@@ -65,7 +65,7 @@ fun HomeScreen(
     // falls rather than always being the last/rightmost item.
     val weekMonday = remember(today) { today.minusDays((today.dayOfWeek.value - 1).toLong()) }
     val weekSunday = remember(weekMonday) { weekMonday.plusDays(6) }
-    val days = remember(weekMonday) { (0..6).map { weekMonday.plusDays(it) } }
+    val days = remember(weekMonday) { (0..6).map { weekMonday.plusDays(it.toLong()) } }
 
     val windowLogs by app.repository.observeLogsBetween(weekMonday, weekSunday).collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
