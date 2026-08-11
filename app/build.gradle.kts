@@ -52,6 +52,22 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+
+        // Real release signing, for store distribution (RuStore). The keystore
+        // itself is NOT committed to the repo (unlike the debug one) - it's kept
+        // as a base64-encoded GitHub Actions secret and only materialized on disk
+        // during CI. Local builds that don't pass these Gradle properties simply
+        // don't get this signingConfig assigned (see buildTypes.release below),
+        // so `./gradlew assembleRelease` still works locally, it just produces an
+        // unsigned APK that can't be installed as-is.
+        if (project.hasProperty("releaseKeystorePath")) {
+            create("release") {
+                storeFile = file(project.property("releaseKeystorePath") as String)
+                storePassword = project.property("releaseKeystorePassword") as String
+                keyAlias = project.property("releaseKeyAlias") as String
+                keyPassword = project.property("releaseKeystorePassword") as String
+            }
+        }
     }
 
     buildTypes {
@@ -61,6 +77,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (project.hasProperty("releaseKeystorePath")) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         debug {
             isMinifyEnabled = false

@@ -38,6 +38,39 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
+      # Signed release build for store distribution (RuStore). Entirely optional -
+      # if RELEASE_KEYSTORE_BASE64 isn't set as a repo secret, these steps just
+      # skip and the debug build above is unaffected. See docs/SETUP_RUSTORE.md.
+      - name: Check whether release signing is configured
+        id: release_check
+        run: |
+          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write release keystore
+        if: steps.release_check.outputs.configured == 'true'
+        run: echo '${{ secrets.RELEASE_KEYSTORE_BASE64 }}' | base64 -d > "$RUNNER_TEMP/release.keystore"
+
+      - name: Build release APK
+        if: steps.release_check.outputs.configured == 'true'
+        run: >
+          gradle assembleRelease --stacktrace
+          -PappVersionCode=${{ github.run_number }}
+          -PreleaseKeystorePath=${{ runner.temp }}/release.keystore
+          -PreleaseKeystorePassword=${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          -PreleaseKeyAlias=${{ secrets.RELEASE_KEY_ALIAS }}
+
+      - name: Upload release APK artifact
+        if: steps.release_check.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: atomic-habits-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
       # Only publish a Release on an actual push to main (not on pull requests) -
       # this is what the in-app updater checks and downloads from, since Release
       # assets have plain public download URLs (unlike Actions artifacts, which

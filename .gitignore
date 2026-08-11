@@ -17,3 +17,4 @@ local.properties
 *.aab
 /app/build
 /app/release
+keystore/release.keystore
