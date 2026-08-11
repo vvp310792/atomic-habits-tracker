@@ -8,6 +8,16 @@
     <string name="home_week_progress">Дни, завершённые на этой неделе: %1$d/%2$d</string>
     <string name="habits_title">Ваши привычки</string>
     <string name="history_title">История</string>
+
+    <!-- Impulse (urge intercept) -->
+    <string name="impulse_title">Позыв</string>
+    <string name="impulse_score">Сегодня: %1$d:%2$d</string>
+    <string name="impulse_breathing_hint">Дышите вместе с кругом, в своём темпе</string>
+    <string name="impulse_check">Удержался</string>
+    <string name="impulse_cross">Поддался</string>
+    <string name="impulse_logged">Записано!</string>
+    <string name="impulse_reflection_title">Что это было?</string>
+    <string name="impulse_note_label">Свободное поле (необязательно)</string>
     <string name="streak_days">%1$d дн. подряд</string>
 
     <!-- Add / Edit habit -->

@@ -28,6 +28,7 @@ import com.atomichabits.tracker.ui.detail.HabitDetailScreen
 import com.atomichabits.tracker.ui.habits.HabitsListScreen
 import com.atomichabits.tracker.ui.history.HistoryScreen
 import com.atomichabits.tracker.ui.home.HomeScreen
+import com.atomichabits.tracker.ui.impulse.ImpulseScreen
 import com.atomichabits.tracker.ui.settings.SettingsScreen
 
 object Routes {
@@ -38,6 +39,7 @@ object Routes {
     const val ADD_EDIT = "add_edit"
     const val DETAIL = "detail"
     const val ANCHORS = "anchors"
+    const val IMPULSE = "impulse"
     const val ARG_HABIT_ID = "habitId"
 
     fun addEdit(habitId: Long? = null) = "$ADD_EDIT?${ARG_HABIT_ID}=${habitId ?: -1L}"
@@ -93,8 +95,13 @@ fun AppNavigation(app: HabitTrackerApp) {
                 HomeScreen(
                     app = app,
                     onAddHabit = { navController.navigate(Routes.addEdit()) },
-                    onOpenHabit = { id -> navController.navigate(Routes.detail(id)) }
+                    onOpenHabit = { id -> navController.navigate(Routes.detail(id)) },
+                    onOpenImpulse = { navController.navigate(Routes.IMPULSE) }
                 )
+            }
+
+            composable(Routes.IMPULSE) {
+                ImpulseScreen(app = app, onBack = { navController.popBackStack() })
             }
 
             composable(Routes.HABITS) {

@@ -9,8 +9,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import java.util.UUID
 
 @Database(
-    entities = [Habit::class, HabitLog::class, AnchorHabit::class],
-    version = 5,
+    entities = [Habit::class, HabitLog::class, AnchorHabit::class, ImpulseLog::class],
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -18,6 +18,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun habitDao(): HabitDao
     abstract fun habitLogDao(): HabitLogDao
     abstract fun anchorHabitDao(): AnchorHabitDao
+    abstract fun impulseLogDao(): ImpulseLogDao
 
     companion object {
         @Volatile
@@ -93,6 +94,28 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v5 -> v6: adds impulse_logs (the "Позыв" checkmark/cross urge-intercept log). */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS impulse_logs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        syncId TEXT NOT NULL DEFAULT '',
+                        dateEpochDay INTEGER NOT NULL DEFAULT 0,
+                        timestampMillis INTEGER NOT NULL DEFAULT 0,
+                        outcome TEXT NOT NULL DEFAULT 'CHECK',
+                        triggerTags TEXT NOT NULL DEFAULT '',
+                        note TEXT NOT NULL DEFAULT ''
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_impulse_logs_syncId ON impulse_logs(syncId)"
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -100,7 +123,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "atomic_habits.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                 INSTANCE = instance
                 instance

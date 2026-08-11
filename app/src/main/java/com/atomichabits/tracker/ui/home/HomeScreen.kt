@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -59,7 +60,8 @@ private val FILTERS = listOf("ALL", "MORNING", "DAY", "EVENING")
 fun HomeScreen(
     app: HabitTrackerApp,
     onAddHabit: () -> Unit,
-    onOpenHabit: (Long) -> Unit
+    onOpenHabit: (Long) -> Unit,
+    onOpenImpulse: () -> Unit
 ) {
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
     val today = remember { LocalDate.now() }
@@ -119,6 +121,9 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text(headerTitle(selectedDate, today)) },
                 actions = {
+                    IconButton(onClick = onOpenImpulse) {
+                        Icon(Icons.Filled.Bolt, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
                     IconButton(onClick = onAddHabit) {
                         Icon(Icons.Filled.Add, contentDescription = null)
                     }

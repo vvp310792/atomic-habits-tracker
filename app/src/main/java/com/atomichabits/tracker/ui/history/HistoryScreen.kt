@@ -2,6 +2,7 @@ package com.atomichabits.tracker.ui.history
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,6 +43,7 @@ fun HistoryScreen(app: HabitTrackerApp, onOpenHabit: (Long) -> Unit) {
     val today = remember { LocalDate.now() }
     val windowStart = remember { today.minusDays(HISTORY_DAYS - 1) }
     val logs by app.repository.observeLogsBetween(windowStart, today).collectAsState(initial = emptyList())
+    val impulseLogs by app.impulseRepository.observeBetween(windowStart, today).collectAsState(initial = emptyList())
 
     val days = remember { (0 until HISTORY_DAYS).map { today.minusDays(it) } } // newest first
 
@@ -59,8 +61,12 @@ fun HistoryScreen(app: HabitTrackerApp, onOpenHabit: (Long) -> Unit) {
                 val completedCount = logs.count {
                     it.dateEpochDay == date.toEpochDay() && it.completed && it.habitId in scheduledIds
                 }
-                if (scheduledIds.isNotEmpty()) {
-                    HistoryDayRow(date, completedCount, scheduledIds.size, today)
+                val dayImpulses = impulseLogs.filter { it.dateEpochDay == date.toEpochDay() }
+                val checks = dayImpulses.count { it.outcome == "CHECK" }
+                val crosses = dayImpulses.count { it.outcome == "CROSS" }
+
+                if (scheduledIds.isNotEmpty() || dayImpulses.isNotEmpty()) {
+                    HistoryDayRow(date, completedCount, scheduledIds.size, checks, crosses, today)
                 }
             }
         }
@@ -68,7 +74,14 @@ fun HistoryScreen(app: HabitTrackerApp, onOpenHabit: (Long) -> Unit) {
 }
 
 @Composable
-private fun HistoryDayRow(date: LocalDate, completed: Int, scheduled: Int, today: LocalDate) {
+private fun HistoryDayRow(
+    date: LocalDate,
+    completed: Int,
+    scheduled: Int,
+    impulseChecks: Int,
+    impulseCrosses: Int,
+    today: LocalDate
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -98,11 +111,22 @@ private fun HistoryDayRow(date: LocalDate, completed: Int, scheduled: Int, today
                     modifier = Modifier.padding(start = 8.dp)
                 )
             }
-            Text(
-                "$completed/$scheduled",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Column(horizontalAlignment = Alignment.End) {
+                if (scheduled > 0) {
+                    Text(
+                        "$completed/$scheduled",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                if (impulseChecks + impulseCrosses > 0) {
+                    Text(
+                        "\u26A1 $impulseChecks:$impulseCrosses",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
         }
     }
 }

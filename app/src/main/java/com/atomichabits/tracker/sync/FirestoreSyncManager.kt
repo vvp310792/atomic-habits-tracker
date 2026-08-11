@@ -5,6 +5,7 @@ import com.atomichabits.tracker.data.AnchorHabit
 import com.atomichabits.tracker.data.AppDatabase
 import com.atomichabits.tracker.data.Habit
 import com.atomichabits.tracker.data.HabitLog
+import com.atomichabits.tracker.data.ImpulseLog
 import com.atomichabits.tracker.notifications.ReminderScheduler
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FieldValue
@@ -34,11 +35,13 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
     private var habitsListener: ListenerRegistration? = null
     private var logsListener: ListenerRegistration? = null
     private var anchorsListener: ListenerRegistration? = null
+    private var impulsesListener: ListenerRegistration? = null
     private val scope = CoroutineScope(Dispatchers.IO)
 
     private fun habitsRef(uid: String) = db.collection("users").document(uid).collection("habits")
     private fun logsRef(uid: String) = db.collection("users").document(uid).collection("logs")
     private fun anchorsRef(uid: String) = db.collection("users").document(uid).collection("anchors")
+    private fun impulsesRef(uid: String) = db.collection("users").document(uid).collection("impulses")
 
     /** Attaches realtime listeners for [uid]'s data. Call on sign-in. Safe to call again to re-attach. */
     fun start(uid: String) {
@@ -55,6 +58,10 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
             val changes = snapshot?.documentChanges ?: return@addSnapshotListener
             scope.launch { mergeAnchorChanges(changes) }
         }
+        impulsesListener = impulsesRef(uid).addSnapshotListener { snapshot, _ ->
+            val changes = snapshot?.documentChanges ?: return@addSnapshotListener
+            scope.launch { mergeImpulseChanges(changes) }
+        }
     }
 
     /** Detaches listeners. Call on sign-out. */
@@ -62,9 +69,11 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
         habitsListener?.remove()
         logsListener?.remove()
         anchorsListener?.remove()
+        impulsesListener?.remove()
         habitsListener = null
         logsListener = null
         anchorsListener = null
+        impulsesListener = null
     }
 
     fun pushHabit(uid: String, habit: Habit) {
@@ -120,6 +129,18 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
         logsRef(uid).document(logDocId(habitSyncId, dateEpochDay)).delete()
     }
 
+    fun pushImpulseLog(uid: String, log: ImpulseLog) {
+        if (log.syncId.isBlank()) return
+        val data = mapOf(
+            "dateEpochDay" to log.dateEpochDay,
+            "timestampMillis" to log.timestampMillis,
+            "outcome" to log.outcome,
+            "triggerTags" to log.triggerTags,
+            "note" to log.note
+        )
+        impulsesRef(uid).document(log.syncId).set(data, SetOptions.merge())
+    }
+
     private fun logDocId(habitSyncId: String, dateEpochDay: Long) = "${habitSyncId}_$dateEpochDay"
 
     /** Pushes everything currently local - used right after first sign-in, and as a manual "sync now". */
@@ -132,6 +153,7 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
             logDao.getAllForHabitOnce(habit.id).forEach { log -> pushLog(uid, habit, log) }
         }
         database.anchorHabitDao().getAllOnce().forEach { anchor -> pushAnchor(uid, anchor) }
+        database.impulseLogDao().getAllOnce().forEach { log -> pushImpulseLog(uid, log) }
     }
 
     private suspend fun mergeHabitChanges(changes: List<DocumentChange>) {
@@ -224,6 +246,27 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
                     type = doc.getString("type") ?: "USEFUL",
                     createdAtEpochDay = doc.getLong("createdAtEpochDay") ?: LocalDate.now().toEpochDay(),
                     archived = doc.getBoolean("archived") ?: false
+                )
+            )
+        }
+    }
+
+    private suspend fun mergeImpulseChanges(changes: List<DocumentChange>) {
+        val impulseDao = database.impulseLogDao()
+        changes.forEach { change ->
+            if (change.type == DocumentChange.Type.REMOVED) return@forEach
+            val doc = change.document
+            val syncId = doc.id
+            val existing = impulseDao.getBySyncId(syncId)
+            impulseDao.upsert(
+                ImpulseLog(
+                    id = existing?.id ?: 0,
+                    syncId = syncId,
+                    dateEpochDay = doc.getLong("dateEpochDay") ?: LocalDate.now().toEpochDay(),
+                    timestampMillis = doc.getLong("timestampMillis") ?: System.currentTimeMillis(),
+                    outcome = doc.getString("outcome") ?: "CHECK",
+                    triggerTags = doc.getString("triggerTags") ?: "",
+                    note = doc.getString("note") ?: ""
                 )
             )
         }
