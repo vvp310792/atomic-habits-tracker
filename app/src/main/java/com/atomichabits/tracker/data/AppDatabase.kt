@@ -39,7 +39,7 @@ abstract class AppDatabase : RoomDatabase() {
                         val rowId = it.getLong(0)
                         db.execSQL(
                             "UPDATE habits SET syncId = ? WHERE id = ?",
-                            arrayOf(UUID.randomUUID().toString(), rowId)
+                            arrayOf<Any>(UUID.randomUUID().toString(), rowId)
                         )
                     }
                 }
