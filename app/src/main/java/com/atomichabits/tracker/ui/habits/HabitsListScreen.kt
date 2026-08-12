@@ -2,7 +2,6 @@ package com.atomichabits.tracker.ui.habits
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,7 +34,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,21 +41,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.AnchorHabit
 import com.atomichabits.tracker.data.Habit
 import com.atomichabits.tracker.ui.components.CategoryTag
+import com.atomichabits.tracker.ui.components.CrossGroupDraggableSections
+import com.atomichabits.tracker.ui.components.DragGroup
+import com.atomichabits.tracker.util.CATEGORY_VALUES
+import com.atomichabits.tracker.util.TIME_OF_DAY_VALUES
+import com.atomichabits.tracker.util.categoryLabel
 import com.atomichabits.tracker.util.timeOfDayLabel
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,11 +111,22 @@ fun HabitsListScreen(
                     )
                 }
                 item {
-                    ReorderableTrackedHabits(
-                        habits = habits,
-                        onOpenHabit = onOpenHabit,
-                        onReorder = { orderedIds -> scope.launch { app.repository.reorder(orderedIds) } }
-                    )
+                    val categoryGroups = CATEGORY_VALUES.map { cat ->
+                        DragGroup(cat, categoryLabel(cat), habits.filter { it.category == cat })
+                    }
+                    CrossGroupDraggableSections(
+                        groups = categoryGroups,
+                        itemKey = { it.id },
+                        onMove = { habit, _, toGroupKey ->
+                            scope.launch { app.repository.saveHabit(habit.copy(category = toGroupKey)) }
+                        },
+                        onReorder = { _, orderedItems ->
+                            scope.launch { app.repository.reorder(orderedItems.map { it.id }) }
+                        },
+                        emptyGroupHint = stringResource(R.string.home_group_empty_hint)
+                    ) { habit, isDragging ->
+                        TrackedHabitRow(habit, isDragging) { onOpenHabit(habit.id) }
+                    }
                 }
             }
 
@@ -129,13 +137,25 @@ fun HabitsListScreen(
             if (useful.isEmpty()) {
                 item { EmptyHint(stringResource(R.string.anchors_empty)) }
             } else {
-                items(useful, key = { "u${it.id}" }) { anchor ->
-                    AnchorRow(
-                        anchor,
-                        onDelete = { scope.launch { app.anchorRepository.archive(anchor.id) } },
-                        onClick = { editingAnchor = anchor }
-                    )
-                    Spacer(Modifier.size(8.dp))
+                item {
+                    val usefulTimeGroups = TIME_OF_DAY_VALUES.map { tod ->
+                        DragGroup(tod, timeOfDayLabel(tod), useful.filter { it.timeOfDay == tod })
+                    }
+                    CrossGroupDraggableSections(
+                        groups = usefulTimeGroups,
+                        itemKey = { it.id },
+                        onMove = { anchor, _, toGroupKey ->
+                            scope.launch { app.anchorRepository.save(anchor.copy(timeOfDay = toGroupKey)) }
+                        },
+                        onReorder = { _, _ -> /* anchors have no manual order field */ },
+                        emptyGroupHint = stringResource(R.string.home_group_empty_hint)
+                    ) { anchor, _ ->
+                        AnchorRow(
+                            anchor,
+                            onDelete = { scope.launch { app.anchorRepository.archive(anchor.id) } },
+                            onClick = { editingAnchor = anchor }
+                        )
+                    }
                 }
             }
 
@@ -200,7 +220,7 @@ fun HabitsListScreen(
             type = dialogType,
             existing = null,
             onDismiss = { addDialogType = null },
-            onSave = { name, alternative, why ->
+            onSave = { name, alternative, why, tod ->
                 scope.launch {
                     app.anchorRepository.save(
                         AnchorHabit(
@@ -208,7 +228,8 @@ fun HabitsListScreen(
                             type = dialogType,
                             createdAtEpochDay = LocalDate.now().toEpochDay(),
                             alternativeSuggestion = alternative,
-                            whyItMatters = why
+                            whyItMatters = why,
+                            timeOfDay = tod
                         )
                     )
                 }
@@ -223,67 +244,20 @@ fun HabitsListScreen(
             type = anchorBeingEdited.type,
             existing = anchorBeingEdited,
             onDismiss = { editingAnchor = null },
-            onSave = { name, alternative, why ->
+            onSave = { name, alternative, why, tod ->
                 scope.launch {
                     app.anchorRepository.save(
-                        anchorBeingEdited.copy(name = name, alternativeSuggestion = alternative, whyItMatters = why)
+                        anchorBeingEdited.copy(
+                            name = name,
+                            alternativeSuggestion = alternative,
+                            whyItMatters = why,
+                            timeOfDay = tod
+                        )
                     )
                 }
                 editingAnchor = null
             }
         )
-    }
-}
-
-@Composable
-private fun ReorderableTrackedHabits(
-    habits: List<Habit>,
-    onOpenHabit: (Long) -> Unit,
-    onReorder: (List<Long>) -> Unit
-) {
-    var items by remember(habits.map { it.id }) { mutableStateOf(habits) }
-    var draggingId by remember { mutableStateOf<Long?>(null) }
-    var dragOffset by remember { mutableFloatStateOf(0f) }
-    val density = LocalDensity.current
-    val rowHeightPx = with(density) { 68.dp.toPx() }
-
-    Column {
-        items.forEachIndexed { _, habit ->
-            val isDragging = habit.id == draggingId
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .zIndex(if (isDragging) 1f else 0f)
-                    .offset { IntOffset(0, if (isDragging) dragOffset.roundToInt() else 0) }
-                    .pointerInput(habit.id) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = { draggingId = habit.id; dragOffset = 0f },
-                            onDragEnd = {
-                                draggingId = null
-                                dragOffset = 0f
-                                onReorder(items.map { it.id })
-                            },
-                            onDragCancel = { draggingId = null; dragOffset = 0f },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                dragOffset += dragAmount.y
-                                val currentIndex = items.indexOfFirst { it.id == habit.id }
-                                val shift = (dragOffset / rowHeightPx).roundToInt()
-                                val targetIndex = (currentIndex + shift).coerceIn(0, items.size - 1)
-                                if (targetIndex != currentIndex) {
-                                    items = items.toMutableList().apply {
-                                        add(targetIndex, removeAt(currentIndex))
-                                    }
-                                    dragOffset -= (targetIndex - currentIndex) * rowHeightPx
-                                }
-                            }
-                        )
-                    }
-            ) {
-                TrackedHabitRow(habit, isDragging) { onOpenHabit(habit.id) }
-            }
-            Spacer(Modifier.size(8.dp))
-        }
     }
 }
 
@@ -426,17 +400,20 @@ private fun AnchorEditDialog(
     type: String,
     existing: AnchorHabit?,
     onDismiss: () -> Unit,
-    onSave: (String, String, String) -> Unit
+    onSave: (String, String, String, String) -> Unit
 ) {
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var alternative by remember { mutableStateOf(existing?.alternativeSuggestion ?: "") }
     var whyItMatters by remember { mutableStateOf(existing?.whyItMatters ?: "") }
+    var timeOfDay by remember { mutableStateOf(existing?.timeOfDay ?: "ALL_DAY") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(
-                onClick = { if (name.isNotBlank()) onSave(name.trim(), alternative.trim(), whyItMatters.trim()) },
+                onClick = {
+                    if (name.isNotBlank()) onSave(name.trim(), alternative.trim(), whyItMatters.trim(), timeOfDay)
+                },
                 enabled = name.isNotBlank()
             ) {
                 Text(stringResource(R.string.save))
@@ -455,6 +432,18 @@ private fun AnchorEditDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (type == "USEFUL") {
+                    Text(stringResource(R.string.field_time_of_day), style = MaterialTheme.typography.labelLarge)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        TIME_OF_DAY_VALUES.forEach { tod ->
+                            androidx.compose.material3.FilterChip(
+                                selected = timeOfDay == tod,
+                                onClick = { timeOfDay = tod },
+                                label = { Text(timeOfDayLabel(tod), style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                    }
+                }
                 if (type == "HARMFUL") {
                     OutlinedTextField(
                         value = alternative,

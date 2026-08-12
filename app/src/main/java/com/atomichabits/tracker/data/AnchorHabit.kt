@@ -22,6 +22,10 @@ import androidx.room.PrimaryKey
  * from momentary willpower ("I will"/"I won't"). E.g. "Хочу быть внимательным
  * отцом по вечерам". Shown alongside the alternative on the Impulse screen to
  * reconnect with the actual reason in the moment of temptation, not just grit.
+ *
+ * [timeOfDay] is USEFUL-only: which part of the day this routine belongs to
+ * (same 4 values as [Habit.timeOfDay]), used to sub-group the "Полезные
+ * привычки" section on the Habits screen.
  */
 @Entity(tableName = "anchor_habits", indices = [Index(value = ["syncId"], unique = true)])
 data class AnchorHabit(
@@ -32,5 +36,6 @@ data class AnchorHabit(
     val createdAtEpochDay: Long = 0,
     val archived: Boolean = false,
     val alternativeSuggestion: String = "",
-    val whyItMatters: String = ""
+    val whyItMatters: String = "",
+    val timeOfDay: String = "ALL_DAY"
 )

@@ -53,6 +53,7 @@ import com.atomichabits.tracker.util.ALL_DAYS_MASK
 import com.atomichabits.tracker.util.categoryColorHex
 import com.atomichabits.tracker.util.TIME_OF_DAY_VALUES
 import com.atomichabits.tracker.util.timeOfDayLabel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -99,6 +100,8 @@ fun AddEditHabitScreen(
     val stackableAnchors = allAnchors.filter { it.type != "DESIRED" }
     val stackableHabits = allHabits.filter { it.id != id }
 
+    var initialLoadDone by remember { mutableStateOf(habitId == null) }
+
     LaunchedEffect(habitId) {
         if (habitId != null) {
             app.database.habitDao().getHabit(habitId)?.let { h ->
@@ -124,6 +127,7 @@ fun AddEditHabitScreen(
                 identityId = h.identityId
                 identityLabel = h.identityLabel
             }
+            initialLoadDone = true
         }
     }
 
@@ -150,6 +154,22 @@ fun AddEditHabitScreen(
         identityId = identityId,
         identityLabel = identityLabel
     )
+
+    // Autosave while editing an existing habit (not while creating a new one -
+    // a half-filled new habit with no name yet shouldn't be silently created).
+    // Debounced: buildHabit() returns a data class, so LaunchedEffect keyed on
+    // it structurally restarts (cancelling the delay) on every field change,
+    // and only actually saves once 600ms pass without a further change.
+    if (initialLoadDone && id != 0L) {
+        val autosaveSnapshot = buildHabit()
+        LaunchedEffect(autosaveSnapshot) {
+            if (autosaveSnapshot.name.isNotBlank()) {
+                delay(600)
+                app.repository.saveHabit(autosaveSnapshot)
+                ReminderScheduler.schedule(context, autosaveSnapshot)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {

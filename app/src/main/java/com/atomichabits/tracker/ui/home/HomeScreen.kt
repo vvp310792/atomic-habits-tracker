@@ -38,9 +38,11 @@ import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.Habit
+import com.atomichabits.tracker.ui.components.CrossGroupDraggableSections
 import com.atomichabits.tracker.ui.components.DateProgressRing
+import com.atomichabits.tracker.ui.components.DragGroup
 import com.atomichabits.tracker.ui.components.HabitCard
-import com.atomichabits.tracker.ui.components.SectionHeader
+import com.atomichabits.tracker.util.TIME_OF_DAY_VALUES
 import com.atomichabits.tracker.util.isHabitScheduledOn
 import com.atomichabits.tracker.util.timeOfDayLabel
 import kotlinx.coroutines.launch
@@ -50,7 +52,7 @@ import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
-private val FILTERS = listOf("ALL", "MORNING", "DAY", "EVENING")
+private val FILTERS = listOf("ALL", "MORNING", "DAY", "EVENING", "ALL_DAY")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,9 +93,10 @@ fun HomeScreen(
             .map { it.habitId }.toSet()
     }
 
-    val morning = habitsForSelectedDate.filter { it.timeOfDay == "MORNING" }
-    val daySection = habitsForSelectedDate.filter { it.timeOfDay == "DAY" }
-    val evening = habitsForSelectedDate.filter { it.timeOfDay == "EVENING" }
+    val timeGroups = TIME_OF_DAY_VALUES.map { tod ->
+        DragGroup(tod, timeOfDayLabel(tod), habitsForSelectedDate.filter { it.timeOfDay == tod })
+    }
+    val visibleTimeGroups = timeGroups.filter { filter == "ALL" || filter == it.key }
 
     // "Perfect days" so far this week (Monday..today, not the whole displayed
     // week - future days can't be "perfect" yet), for the weekly counter card.
@@ -167,64 +170,32 @@ fun HomeScreen(
                 }
             }
 
-            if (filter == "ALL" || filter == "MORNING") {
-                if (morning.isNotEmpty()) {
-                    item { SectionHeader(timeOfDayLabel("MORNING")) }
-                    items(morning, key = { "m${it.id}" }) { habit ->
-                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
-                            HabitCard(
-                                habit = habit,
-                                completedToday = habit.id in completedIdsForSelectedDate,
-                                repository = app.repository,
-                                refreshKey = habit.id in completedIdsForSelectedDate,
-                                onToggle = habitToggle(habit),
-                                onClick = { onOpenHabit(habit.id) }
-                            )
-                        }
-                    }
-                }
-            }
-            if (filter == "ALL" || filter == "DAY") {
-                if (daySection.isNotEmpty()) {
-                    item { SectionHeader(timeOfDayLabel("DAY")) }
-                    items(daySection, key = { "d${it.id}" }) { habit ->
-                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
-                            HabitCard(
-                                habit = habit,
-                                completedToday = habit.id in completedIdsForSelectedDate,
-                                repository = app.repository,
-                                refreshKey = habit.id in completedIdsForSelectedDate,
-                                onToggle = habitToggle(habit),
-                                onClick = { onOpenHabit(habit.id) }
-                            )
-                        }
-                    }
-                }
-            }
-            if (filter == "ALL" || filter == "EVENING") {
-                if (evening.isNotEmpty()) {
-                    item { SectionHeader(timeOfDayLabel("EVENING")) }
-                    items(evening, key = { "e${it.id}" }) { habit ->
-                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
-                            HabitCard(
-                                habit = habit,
-                                completedToday = habit.id in completedIdsForSelectedDate,
-                                repository = app.repository,
-                                refreshKey = habit.id in completedIdsForSelectedDate,
-                                onToggle = habitToggle(habit),
-                                onClick = { onOpenHabit(habit.id) }
-                            )
-                        }
+            item {
+                CrossGroupDraggableSections(
+                    groups = visibleTimeGroups,
+                    itemKey = { it.id },
+                    onMove = { habit, _, toGroupKey ->
+                        scope.launch { app.repository.saveHabit(habit.copy(timeOfDay = toGroupKey)) }
+                    },
+                    onReorder = { _, orderedItems ->
+                        scope.launch { app.repository.reorder(orderedItems.map { it.id }) }
+                    },
+                    emptyGroupHint = stringResource(R.string.home_group_empty_hint)
+                ) { habit, isDragging ->
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
+                        HabitCard(
+                            habit = habit,
+                            completedToday = habit.id in completedIdsForSelectedDate,
+                            repository = app.repository,
+                            refreshKey = habit.id in completedIdsForSelectedDate,
+                            onToggle = habitToggle(habit),
+                            onClick = { onOpenHabit(habit.id) }
+                        )
                     }
                 }
             }
 
-            val visibleCount = when (filter) {
-                "MORNING" -> morning.size
-                "DAY" -> daySection.size
-                "EVENING" -> evening.size
-                else -> habitsForSelectedDate.size
-            }
+            val visibleCount = habitsForSelectedDate.size
             if (visibleCount == 0) {
                 item {
                     Box(
@@ -264,6 +235,7 @@ private fun filterLabel(f: String): String = when (f) {
     "MORNING" -> "Утром"
     "DAY" -> "Днём"
     "EVENING" -> "Вечером"
+    "ALL_DAY" -> "Весь день"
     else -> "Все"
 }
 

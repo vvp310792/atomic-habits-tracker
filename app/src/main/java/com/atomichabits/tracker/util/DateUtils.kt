@@ -19,10 +19,11 @@ fun isHabitScheduledOn(activeDays: Int, date: LocalDate): Boolean {
 fun isHabitScheduledToday(activeDays: Int): Boolean = isHabitScheduledOn(activeDays, LocalDate.now())
 
 /** Storage values for Habit.timeOfDay, in display order. */
-val TIME_OF_DAY_VALUES = listOf("MORNING", "DAY", "EVENING")
+val TIME_OF_DAY_VALUES = listOf("MORNING", "DAY", "EVENING", "ALL_DAY")
 
 fun timeOfDayLabel(value: String): String = when (value) {
     "DAY" -> "День"
     "EVENING" -> "Вечер"
+    "ALL_DAY" -> "Весь день"
     else -> "Утро"
 }
