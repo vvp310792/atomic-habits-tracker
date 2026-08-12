@@ -206,15 +206,18 @@ private fun UniversalHabitRow(habit: Habit, impulseScore: Pair<Int, Int>?, onCli
             }
             Spacer(Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(habit.name, style = MaterialTheme.typography.bodyLarge)
-                    if (!habit.isTracked) {
-                        Text(
-                            " · " + stringResource(R.string.habits_not_tracked_badge),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                        )
-                    }
+                Text(
+                    habit.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                if (!habit.isTracked) {
+                    Text(
+                        stringResource(R.string.habits_not_tracked_badge),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    )
                 }
                 if (habit.isTracked) {
                     CategoryTag(value = habit.category)

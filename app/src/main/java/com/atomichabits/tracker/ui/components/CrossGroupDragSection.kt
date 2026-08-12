@@ -58,10 +58,12 @@ fun <T> CrossGroupDraggableSections(
     itemContent: @Composable (T, isDragging: Boolean) -> Unit
 ) {
     val density = LocalDensity.current
-    val rowHeightPx = with(density) { 68.dp.toPx() }
+    val fallbackRowHeightPx = with(density) { 68.dp.toPx() }
+    val spacerPx = with(density) { 8.dp.toPx() }
 
     val groupBounds = remember { mutableStateMapOf<String, Rect>() }
     val itemOrigins = remember { mutableStateMapOf<Any, Offset>() }
+    val itemHeights = remember { mutableStateMapOf<Any, Float>() }
     var draggedKey by remember { mutableStateOf<Any?>(null) }
     var draggedFromGroup by remember { mutableStateOf<String?>(null) }
     var dragOffsetY by remember { mutableStateOf(0f) }
@@ -107,7 +109,10 @@ fun <T> CrossGroupDraggableSections(
                                 .zIndex(if (isDragging) 1f else 0f)
                                 .offset { if (isDragging) IntOffset(0, dragOffsetY.roundToInt()) else IntOffset.Zero }
                                 .onGloballyPositioned { coords ->
-                                    if (draggedKey != key) itemOrigins[key] = coords.positionInWindow()
+                                    if (draggedKey != key) {
+                                        itemOrigins[key] = coords.positionInWindow()
+                                        itemHeights[key] = coords.size.height.toFloat()
+                                    }
                                 }
                                 .pointerInput(key) {
                                     detectDragGesturesAfterLongPress(
@@ -160,7 +165,8 @@ fun <T> CrossGroupDraggableSections(
                                                 val g = localGroups.find { it.key == draggedFromGroup }
                                                 val currentIndex = g?.items?.indexOfFirst { itemKey(it) == key } ?: -1
                                                 if (g != null && currentIndex >= 0) {
-                                                    val shift = (dragOffsetY / rowHeightPx).roundToInt()
+                                                    val effectiveStepPx = (itemHeights[key] ?: fallbackRowHeightPx) + spacerPx
+                                                    val shift = (dragOffsetY / effectiveStepPx).roundToInt()
                                                     val targetIndex = (currentIndex + shift).coerceIn(0, g.items.size - 1)
                                                     if (targetIndex != currentIndex) {
                                                         val newItems = g.items.toMutableList().apply {
@@ -169,7 +175,7 @@ fun <T> CrossGroupDraggableSections(
                                                         localGroups = localGroups.map {
                                                             if (it.key == g.key) it.copy(items = newItems) else it
                                                         }
-                                                        dragOffsetY -= shift * rowHeightPx
+                                                        dragOffsetY -= shift * effectiveStepPx
                                                     }
                                                 }
                                             }
