@@ -63,6 +63,8 @@ fun AddEditHabitScreen(
     app: HabitTrackerApp,
     habitId: Long?,
     initialName: String? = null,
+    initialQualityType: String? = null,
+    initialTracked: Boolean? = null,
     onDone: () -> Unit
 ) {
     val context = LocalContext.current
@@ -74,6 +76,10 @@ fun AddEditHabitScreen(
     var emoji by remember { mutableStateOf("\u2705") }
     var category by remember { mutableStateOf("SELF_DEVELOPMENT") }
     var colorHex by remember { mutableStateOf(categoryColorHex("SELF_DEVELOPMENT")) }
+    var qualityType by remember { mutableStateOf(initialQualityType ?: "USEFUL") }
+    var isTracked by remember { mutableStateOf(initialTracked ?: true) }
+    var alternativeSuggestion by remember { mutableStateOf("") }
+    var whyItMatters by remember { mutableStateOf("") }
     var activeDays by remember { mutableStateOf(ALL_DAYS_MASK) }
     var timeOfDay by remember { mutableStateOf("MORNING") }
     var reminderEnabled by remember { mutableStateOf(false) }
@@ -95,10 +101,8 @@ fun AddEditHabitScreen(
     var showIdentityPicker by remember { mutableStateOf(false) }
 
     val allHabits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
-    val allAnchors by app.anchorRepository.observeActive().collectAsState(initial = emptyList())
     val allIdentities by app.identityRepository.observeActive().collectAsState(initial = emptyList())
-    val stackableAnchors = allAnchors.filter { it.type != "DESIRED" }
-    val stackableHabits = allHabits.filter { it.id != id }
+    val stackableHabits = allHabits.filter { it.id != id && it.qualityType != "DESIRED" }
 
     var initialLoadDone by remember { mutableStateOf(habitId == null) }
 
@@ -111,6 +115,10 @@ fun AddEditHabitScreen(
                 emoji = h.emoji
                 category = h.category
                 colorHex = h.colorHex
+                qualityType = h.qualityType
+                isTracked = h.isTracked
+                alternativeSuggestion = h.alternativeSuggestion
+                whyItMatters = h.whyItMatters
                 activeDays = h.activeDays
                 timeOfDay = h.timeOfDay
                 reminderEnabled = h.reminderEnabled
@@ -138,6 +146,10 @@ fun AddEditHabitScreen(
         emoji = emoji,
         colorHex = colorHex,
         category = category,
+        qualityType = qualityType,
+        isTracked = isTracked,
+        alternativeSuggestion = alternativeSuggestion,
+        whyItMatters = whyItMatters,
         activeDays = activeDays,
         timeOfDay = timeOfDay,
         reminderEnabled = reminderEnabled,
@@ -203,6 +215,50 @@ fun AddEditHabitScreen(
                 label = { Text(stringResource(R.string.field_name)) },
                 modifier = Modifier.fillMaxWidth()
             )
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.field_quality_type), style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(selected = qualityType == "USEFUL", onClick = { qualityType = "USEFUL" }, label = { Text(stringResource(R.string.scorecard_positive)) })
+                    FilterChip(selected = qualityType == "NEUTRAL", onClick = { qualityType = "NEUTRAL" }, label = { Text(stringResource(R.string.scorecard_neutral)) })
+                    FilterChip(selected = qualityType == "DESIRED", onClick = { qualityType = "DESIRED" }, label = { Text(stringResource(R.string.field_quality_desired)) })
+                    FilterChip(selected = qualityType == "HARMFUL", onClick = { qualityType = "HARMFUL" }, label = { Text(stringResource(R.string.scorecard_negative)) })
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(stringResource(R.string.field_is_tracked), style = MaterialTheme.typography.labelLarge)
+                    Switch(checked = isTracked, onCheckedChange = { isTracked = it })
+                }
+                Text(
+                    stringResource(R.string.field_is_tracked_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+
+            if (qualityType == "HARMFUL") {
+                OutlinedTextField(
+                    value = alternativeSuggestion,
+                    onValueChange = { alternativeSuggestion = it },
+                    label = { Text(stringResource(R.string.anchors_alternative_label)) },
+                    placeholder = { Text(stringResource(R.string.anchors_alternative_hint)) },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = whyItMatters,
+                    onValueChange = { whyItMatters = it },
+                    label = { Text(stringResource(R.string.anchors_why_label)) },
+                    placeholder = { Text(stringResource(R.string.anchors_why_hint)) },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.field_icon), style = MaterialTheme.typography.labelLarge)
@@ -347,8 +403,7 @@ fun AddEditHabitScreen(
 
     if (showStackPicker) {
         StackAnchorPickerDialog(
-            trackedHabits = stackableHabits,
-            anchors = stackableAnchors,
+            candidates = stackableHabits,
             onDismiss = { showStackPicker = false },
             onPick = { target: StackTarget? ->
                 if (target == null) {

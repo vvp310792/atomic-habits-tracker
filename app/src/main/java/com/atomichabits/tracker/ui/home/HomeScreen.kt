@@ -62,6 +62,7 @@ fun HomeScreen(
     onOpenHabit: (Long) -> Unit
 ) {
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
+    val trackedHabits = remember(habits) { habits.filter { it.isTracked } }
     val today = remember { LocalDate.now() }
     // Full current week Monday..Sunday, so "today" sits wherever its weekday
     // falls rather than always being the last/rightmost item.
@@ -75,9 +76,9 @@ fun HomeScreen(
     var selectedDate by remember { mutableStateOf(today) }
     var filter by remember { mutableStateOf("ALL") }
 
-    val progressByDate = remember(habits, windowLogs) {
+    val progressByDate = remember(trackedHabits, windowLogs) {
         days.associateWith { date ->
-            val scheduledIds = habits.filter { isHabitScheduledOn(it.activeDays, date) }.map { it.id }.toSet()
+            val scheduledIds = trackedHabits.filter { isHabitScheduledOn(it.activeDays, date) }.map { it.id }.toSet()
             val completedCount = windowLogs.count {
                 it.dateEpochDay == date.toEpochDay() && it.completed && it.habitId in scheduledIds
             }
@@ -85,8 +86,8 @@ fun HomeScreen(
         }
     }
 
-    val habitsForSelectedDate = remember(habits, selectedDate) {
-        habits.filter { isHabitScheduledOn(it.activeDays, selectedDate) }
+    val habitsForSelectedDate = remember(trackedHabits, selectedDate) {
+        trackedHabits.filter { isHabitScheduledOn(it.activeDays, selectedDate) }
     }
     val completedIdsForSelectedDate = remember(windowLogs, selectedDate) {
         windowLogs.filter { it.dateEpochDay == selectedDate.toEpochDay() && it.completed }
@@ -103,9 +104,9 @@ fun HomeScreen(
     val weekDaysElapsed = remember(today, weekMonday) {
         (0..ChronoUnit.DAYS.between(weekMonday, today)).map { weekMonday.plusDays(it) }
     }
-    val perfectDaysThisWeek = remember(habits, windowLogs, weekDaysElapsed) {
+    val perfectDaysThisWeek = remember(trackedHabits, windowLogs, weekDaysElapsed) {
         weekDaysElapsed.count { date ->
-            val scheduled = habits.filter { isHabitScheduledOn(it.activeDays, date) }.map { it.id }.toSet()
+            val scheduled = trackedHabits.filter { isHabitScheduledOn(it.activeDays, date) }.map { it.id }.toSet()
             if (scheduled.isEmpty()) return@count false
             val completed = windowLogs.filter { it.dateEpochDay == date.toEpochDay() && it.completed }.map { it.habitId }.toSet()
             scheduled.all { it in completed }

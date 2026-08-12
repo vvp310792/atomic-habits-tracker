@@ -41,7 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
-import com.atomichabits.tracker.data.AnchorHabit
+import com.atomichabits.tracker.data.Habit
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -59,8 +59,14 @@ fun ScorecardScreen(app: HabitTrackerApp, onBack: () -> Unit) {
         if (name.isBlank()) return
         val entryName = name.trim()
         scope.launch {
-            app.anchorRepository.save(
-                AnchorHabit(name = entryName, type = selectedType, createdAtEpochDay = LocalDate.now().toEpochDay())
+            app.repository.saveHabit(
+                Habit(
+                    syncId = java.util.UUID.randomUUID().toString(),
+                    name = entryName,
+                    qualityType = selectedType,
+                    isTracked = false,
+                    createdAtEpochDay = LocalDate.now().toEpochDay()
+                )
             )
         }
         addedThisSession.add(0, ScoredEntry(entryName, selectedType))

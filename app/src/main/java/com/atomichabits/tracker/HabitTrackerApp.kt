@@ -1,7 +1,6 @@
 package com.atomichabits.tracker
 
 import android.app.Application
-import com.atomichabits.tracker.data.AnchorRepository
 import com.atomichabits.tracker.data.AppDatabase
 import com.atomichabits.tracker.data.HabitRepository
 import com.atomichabits.tracker.data.IdentityRepository
@@ -25,14 +24,6 @@ class HabitTrackerApp : Application() {
         HabitRepository(
             database.habitDao(),
             database.habitLogDao(),
-            syncManager = syncManager,
-            currentUid = { authManager.currentUser?.uid }
-        )
-    }
-
-    val anchorRepository: AnchorRepository by lazy {
-        AnchorRepository(
-            database.anchorHabitDao(),
             syncManager = syncManager,
             currentUid = { authManager.currentUser?.uid }
         )
@@ -62,10 +53,6 @@ class HabitTrackerApp : Application() {
     override fun onCreate() {
         super.onCreate()
         NotificationHelper.ensureChannel(this)
-
-        appScope.launch {
-            anchorRepository.healBlankSyncIds()
-        }
 
         appScope.launch {
             authManager.authStateFlow().collect { user ->

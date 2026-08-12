@@ -16,22 +16,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.R
-import com.atomichabits.tracker.data.AnchorHabit
 import com.atomichabits.tracker.data.Habit
 
-/** A resolved stack target - either a library anchor or another tracked habit. */
+/** A resolved stack target - the syncId of the habit this one is chained after. */
 data class StackTarget(val id: String, val type: String, val label: String)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StackAnchorPickerDialog(
-    trackedHabits: List<Habit>,
-    anchors: List<AnchorHabit>,
+    candidates: List<Habit>,
     onDismiss: () -> Unit,
     onPick: (StackTarget?) -> Unit
 ) {
-    val useful = anchors.filter { it.type == "USEFUL" }
-    val harmful = anchors.filter { it.type == "HARMFUL" }
+    val tracked = candidates.filter { it.isTracked }
+    val useful = candidates.filter { !it.isTracked && it.qualityType == "USEFUL" }
+    val harmful = candidates.filter { !it.isTracked && it.qualityType == "HARMFUL" }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -52,7 +51,7 @@ fun StackAnchorPickerDialog(
                             .padding(vertical = 10.dp)
                     )
                 }
-                if (trackedHabits.isNotEmpty()) {
+                if (tracked.isNotEmpty()) {
                     item {
                         Text(
                             stringResource(R.string.stack_picker_habits),
@@ -60,7 +59,7 @@ fun StackAnchorPickerDialog(
                             modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
                         )
                     }
-                    items(trackedHabits, key = { "h${it.id}" }) { habit ->
+                    items(tracked, key = { "t${it.id}" }) { habit ->
                         StackOptionRow("${habit.emoji} ${habit.name}") {
                             onPick(StackTarget(habit.syncId, "HABIT", habit.name))
                         }
@@ -74,9 +73,9 @@ fun StackAnchorPickerDialog(
                             modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
                         )
                     }
-                    items(useful, key = { "u${it.id}" }) { anchor ->
-                        StackOptionRow(anchor.name) {
-                            onPick(StackTarget(anchor.syncId, "ANCHOR", anchor.name))
+                    items(useful, key = { "u${it.id}" }) { habit ->
+                        StackOptionRow(habit.name) {
+                            onPick(StackTarget(habit.syncId, "HABIT", habit.name))
                         }
                     }
                 }
@@ -88,13 +87,13 @@ fun StackAnchorPickerDialog(
                             modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
                         )
                     }
-                    items(harmful, key = { "hm${it.id}" }) { anchor ->
-                        StackOptionRow(anchor.name) {
-                            onPick(StackTarget(anchor.syncId, "ANCHOR", anchor.name))
+                    items(harmful, key = { "hm${it.id}" }) { habit ->
+                        StackOptionRow(habit.name) {
+                            onPick(StackTarget(habit.syncId, "HABIT", habit.name))
                         }
                     }
                 }
-                if (trackedHabits.isEmpty() && anchors.isEmpty()) {
+                if (candidates.isEmpty()) {
                     item {
                         Text(
                             stringResource(R.string.stack_picker_empty),

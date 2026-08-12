@@ -31,18 +31,28 @@ import androidx.room.PrimaryKey
  * color (see util/Categories.kt), which is what [colorHex] is derived from.
  *
  * Habit stacking (Clear's "After [CURRENT HABIT], I will [NEW HABIT]"):
- * [stackAnchorId] is the syncId of whatever this habit is chained after - either
- * an [AnchorHabit] (an already-established routine, not itself tracked) or
- * another tracked [Habit] (so the chain can keep growing as habits mature).
- * [stackAnchorType] disambiguates which table [stackAnchorId] refers to:
- * "ANCHOR" or "HABIT" ("" = not stacked onto anything). [stackAnchorLabel] is a
- * cached copy of the anchor's display name, so the chain still reads sensibly
- * even if the anchor is later renamed or removed.
+ * [stackAnchorId] is the syncId of whatever habit this one is chained after -
+ * since every habit is now the same universal entity (tracked or not), this can
+ * be any other habit. [stackAnchorType] is a legacy field kept for backward
+ * compatibility with pre-unification data ("ANCHOR" or "HABIT", "" = not
+ * stacked onto anything) but is no longer used to disambiguate lookups.
+ * [stackAnchorLabel] is a cached copy of the target's display name, so the
+ * chain still reads sensibly even if it's later renamed or removed.
  *
  * [identityId] optionally links this habit to an [Identity] (James Clear's
  * identity-based habits) - each completion of the habit counts as a "vote"
  * for that identity. [identityLabel] caches the statement text for display,
  * same pattern as [stackAnchorLabel].
+ *
+ * Every habit is one universal entity, classified by two independent flags:
+ * [qualityType] ("USEFUL" | "HARMFUL" | "NEUTRAL" | "DESIRED") is the honest,
+ * judgment-free tag from the Habit Scorecard exercise - what kind of thing this
+ * is. [isTracked] is whether it's *also* being actively tracked (shows on the
+ * Today screen, has logs/streaks/reminders) versus just existing as a library
+ * reference (a stacking anchor, an Impulse-screen link target, or a backlog
+ * idea). A habit can be USEFUL and tracked, USEFUL and not-yet-tracked, etc. -
+ * the two are independent. [alternativeSuggestion]/[whyItMatters] are only
+ * meaningful for HARMFUL entries (see FirestoreSyncManager/ImpulseScreen).
  */
 @Entity(tableName = "habits", indices = [Index(value = ["syncId"], unique = true)])
 data class Habit(
@@ -52,6 +62,8 @@ data class Habit(
     val emoji: String = "\u2705",
     val colorHex: String = "#7C6CF0",
     val category: String = "SELF_DEVELOPMENT",
+    val qualityType: String = "USEFUL", // "USEFUL" | "HARMFUL" | "NEUTRAL" | "DESIRED"
+    val isTracked: Boolean = true,
     val activeDays: Int = 127,
     val timeOfDay: String = "MORNING",
     val reminderEnabled: Boolean = false,
@@ -61,6 +73,8 @@ data class Habit(
     val lawAttractive: String = "",
     val lawEasy: String = "",
     val lawSatisfying: String = "",
+    val alternativeSuggestion: String = "",
+    val whyItMatters: String = "",
     val createdAtEpochDay: Long = 0,
     val archived: Boolean = false,
     val sortOrder: Int = 0,

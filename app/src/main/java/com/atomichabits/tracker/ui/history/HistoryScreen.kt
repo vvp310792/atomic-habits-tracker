@@ -54,7 +54,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
-import com.atomichabits.tracker.data.AnchorHabit
 import com.atomichabits.tracker.data.Habit
 import com.atomichabits.tracker.data.HabitLog
 import com.atomichabits.tracker.data.ImpulseLog
@@ -67,15 +66,15 @@ import java.time.temporal.ChronoUnit
 @Composable
 fun HistoryScreen(app: HabitTrackerApp, onOpenHabit: (Long) -> Unit) {
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
+    val trackedHabits = remember(habits) { habits.filter { it.isTracked } }
     val allLogs by app.repository.observeAllLogs().collectAsState(initial = emptyList())
     val impulseLogs by app.impulseRepository.observeAll().collectAsState(initial = emptyList())
-    val anchors by app.anchorRepository.observeActive().collectAsState(initial = emptyList())
     val today = remember { LocalDate.now() }
 
     var tabIndex by remember { mutableIntStateOf(0) }
     var visibleMonth by remember { mutableStateOf(YearMonth.from(today)) }
 
-    val stats = remember(habits, allLogs) { computeHistoryStats(habits, allLogs, today) }
+    val stats = remember(trackedHabits, allLogs) { computeHistoryStats(trackedHabits, allLogs, today) }
 
     Scaffold(
         topBar = {
@@ -92,15 +91,15 @@ fun HistoryScreen(app: HabitTrackerApp, onOpenHabit: (Long) -> Unit) {
         Box(modifier = Modifier.padding(padding)) {
             when (tabIndex) {
                 0 -> CalendarTab(
-                    habits = habits,
+                    habits = trackedHabits,
                     allLogs = allLogs,
                     stats = stats,
                     today = today,
                     visibleMonth = visibleMonth,
                     onMonthChange = { visibleMonth = it }
                 )
-                1 -> HabitsStatsTab(habits, allLogs)
-                else -> AchievementsTab(habits, impulseLogs, anchors, stats)
+                1 -> HabitsStatsTab(trackedHabits, allLogs)
+                else -> AchievementsTab(habits, impulseLogs, stats)
             }
         }
     }
@@ -501,11 +500,11 @@ private data class Achievement(val title: String, val description: String, val i
 private fun AchievementsTab(
     habits: List<Habit>,
     impulseLogs: List<ImpulseLog>,
-    anchors: List<AnchorHabit>,
     stats: HistoryStats
 ) {
     val impulseChecks = impulseLogs.count { it.outcome == "CHECK" }
-    val achievements = remember(stats, impulseChecks, anchors, habits) {
+    val libraryEntries = habits.count { !it.isTracked }
+    val achievements = remember(stats, impulseChecks, libraryEntries, habits) {
         listOf(
             Achievement("Первый шаг", "Выполните первую привычку", Icons.Filled.EmojiEvents, stats.totalCompletionsEver >= 1),
             Achievement("Неделя силы", "Серия из 7 дней по одной привычке", Icons.Filled.EmojiEvents, stats.bestStreakEver >= 7),
@@ -514,7 +513,7 @@ private fun AchievementsTab(
             Achievement("500 побед", "500 отметок о выполнении всего", Icons.Filled.EmojiEvents, stats.totalCompletionsEver >= 500),
             Achievement("Идеальная неделя", "Все привычки выполнены все 7 дней подряд", Icons.Filled.EmojiEvents, stats.perfectDaysThisWeek >= 7),
             Achievement("Мастер позыва", "10 удержанных позывов", Icons.Filled.EmojiEvents, impulseChecks >= 10),
-            Achievement("Библиотекарь", "5 привычек в библиотеке опор", Icons.Filled.EmojiEvents, anchors.size >= 5)
+            Achievement("Библиотекарь", "5 привычек в библиотеке опор", Icons.Filled.EmojiEvents, libraryEntries >= 5)
         )
     }
 

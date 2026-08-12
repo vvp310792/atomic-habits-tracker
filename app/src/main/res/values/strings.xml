@@ -9,7 +9,11 @@
     <string name="home_week_progress">Дни, завершённые на этой неделе: %1$d/%2$d</string>
     <string name="habits_title">Ваши привычки</string>
     <string name="habits_section_tracked">Создаваемые привычки</string>
-    <string name="habits_reorder_hint">Зажмите карточку и перетащите, чтобы изменить порядок</string>
+    <string name="habits_section_green">Создаваемые и полезные</string>
+    <string name="habits_section_yellow">Желаемые и нейтральные</string>
+    <string name="habits_section_red">Вредные привычки</string>
+    <string name="habits_not_tracked_badge">не отслеживается</string>
+    <string name="habits_reorder_hint">Зажмите карточку и перетащите, чтобы изменить порядок или время суток</string>
     <string name="history_title">История</string>
     <string name="history_tab_calendar">Календарь</string>
     <string name="history_tab_habits">Все привычки</string>
@@ -55,6 +59,10 @@
     <string name="field_stack">Привычка-стек</string>
     <string name="field_identity">Идентичность</string>
     <string name="field_identity_none">Без привязки</string>
+    <string name="field_quality_type">Тип привычки</string>
+    <string name="field_quality_desired">Желаемая</string>
+    <string name="field_is_tracked">Отслеживать</string>
+    <string name="field_is_tracked_hint">Показывать на экране «Сегодня», с напоминаниями и статистикой. Выключите для справочной записи (библиотека/стек/позыв).</string>
     <string name="field_stack_selected">После: %1$s</string>
     <string name="save">Сохранить</string>
     <string name="delete">Удалить</string>

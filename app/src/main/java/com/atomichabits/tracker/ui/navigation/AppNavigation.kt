@@ -53,10 +53,20 @@ object Routes {
     const val SCORECARD = "scorecard"
     const val ARG_HABIT_ID = "habitId"
     const val ARG_INITIAL_NAME = "initialName"
+    const val ARG_INITIAL_TYPE = "initialType"
+    const val ARG_INITIAL_TRACKED = "initialTracked"
 
-    fun addEdit(habitId: Long? = null, initialName: String? = null): String {
+    fun addEdit(
+        habitId: Long? = null,
+        initialName: String? = null,
+        initialQualityType: String? = null,
+        initialTracked: Boolean? = null
+    ): String {
         val encodedName = URLEncoder.encode(initialName ?: "", "UTF-8")
-        return "$ADD_EDIT?${ARG_HABIT_ID}=${habitId ?: -1L}&${ARG_INITIAL_NAME}=$encodedName"
+        val type = initialQualityType ?: ""
+        val tracked = initialTracked?.toString() ?: ""
+        return "$ADD_EDIT?${ARG_HABIT_ID}=${habitId ?: -1L}&${ARG_INITIAL_NAME}=$encodedName" +
+            "&${ARG_INITIAL_TYPE}=$type&${ARG_INITIAL_TRACKED}=$tracked"
     }
 
     fun detail(habitId: Long) = "$DETAIL/$habitId"
@@ -146,9 +156,11 @@ fun AppNavigation(app: HabitTrackerApp) {
             composable(Routes.HABITS) {
                 HabitsListScreen(
                     app = app,
-                    onAddHabit = { navController.navigate(Routes.addEdit()) },
                     onOpenHabit = { id -> navController.navigate(Routes.detail(id)) },
-                    onStartDesired = { name -> navController.navigate(Routes.addEdit(initialName = name)) }
+                    onEditUntracked = { id -> navController.navigate(Routes.addEdit(id)) },
+                    onAddHabit = { quality, tracked ->
+                        navController.navigate(Routes.addEdit(initialQualityType = quality, initialTracked = tracked))
+                    }
                 )
             }
 
@@ -169,7 +181,10 @@ fun AppNavigation(app: HabitTrackerApp) {
             }
 
             composable(
-                route = "${Routes.ADD_EDIT}?${Routes.ARG_HABIT_ID}={${Routes.ARG_HABIT_ID}}&${Routes.ARG_INITIAL_NAME}={${Routes.ARG_INITIAL_NAME}}",
+                route = "${Routes.ADD_EDIT}?${Routes.ARG_HABIT_ID}={${Routes.ARG_HABIT_ID}}" +
+                    "&${Routes.ARG_INITIAL_NAME}={${Routes.ARG_INITIAL_NAME}}" +
+                    "&${Routes.ARG_INITIAL_TYPE}={${Routes.ARG_INITIAL_TYPE}}" +
+                    "&${Routes.ARG_INITIAL_TRACKED}={${Routes.ARG_INITIAL_TRACKED}}",
                 arguments = listOf(
                     navArgument(Routes.ARG_HABIT_ID) {
                         type = NavType.LongType
@@ -178,16 +193,28 @@ fun AppNavigation(app: HabitTrackerApp) {
                     navArgument(Routes.ARG_INITIAL_NAME) {
                         type = NavType.StringType
                         defaultValue = ""
+                    },
+                    navArgument(Routes.ARG_INITIAL_TYPE) {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument(Routes.ARG_INITIAL_TRACKED) {
+                        type = NavType.StringType
+                        defaultValue = ""
                     }
                 )
             ) { entry ->
                 val habitId = entry.arguments?.getLong(Routes.ARG_HABIT_ID) ?: -1L
                 val encodedName = entry.arguments?.getString(Routes.ARG_INITIAL_NAME) ?: ""
                 val initialName = if (encodedName.isBlank()) null else URLDecoder.decode(encodedName, "UTF-8")
+                val initialType = entry.arguments?.getString(Routes.ARG_INITIAL_TYPE)?.ifBlank { null }
+                val initialTracked = entry.arguments?.getString(Routes.ARG_INITIAL_TRACKED)?.ifBlank { null }?.toBoolean()
                 AddEditHabitScreen(
                     app = app,
                     habitId = if (habitId == -1L) null else habitId,
                     initialName = initialName,
+                    initialQualityType = initialType,
+                    initialTracked = initialTracked,
                     onDone = { navController.popBackStack() }
                 )
             }

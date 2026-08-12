@@ -9,15 +9,14 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import java.util.UUID
 
 @Database(
-    entities = [Habit::class, HabitLog::class, AnchorHabit::class, ImpulseLog::class, Identity::class],
-    version = 11,
+    entities = [Habit::class, HabitLog::class, ImpulseLog::class, Identity::class],
+    version = 12,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun habitDao(): HabitDao
     abstract fun habitLogDao(): HabitLogDao
-    abstract fun anchorHabitDao(): AnchorHabitDao
     abstract fun impulseLogDao(): ImpulseLogDao
     abstract fun identityDao(): IdentityDao
 
@@ -168,6 +167,47 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v11 -> v12: unifies Habit and AnchorHabit into one universal entity.
+         * Adds qualityType/isTracked/alternativeSuggestion/whyItMatters to habits,
+         * then copies every existing anchor_habits row across as an untracked
+         * (isTracked=0) habit carrying its old type as qualityType. The old
+         * anchor_habits table is deliberately NOT dropped - it's just an orphaned,
+         * unused table from here on - so a bug in this one-shot copy can't destroy
+         * data with no way back.
+         */
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE habits ADD COLUMN qualityType TEXT NOT NULL DEFAULT 'USEFUL'")
+                db.execSQL("ALTER TABLE habits ADD COLUMN isTracked INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE habits ADD COLUMN alternativeSuggestion TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE habits ADD COLUMN whyItMatters TEXT NOT NULL DEFAULT ''")
+
+                db.execSQL(
+                    """
+                    INSERT INTO habits (
+                        syncId, name, emoji, colorHex, category, qualityType, isTracked,
+                        activeDays, timeOfDay, reminderEnabled, reminderHour, reminderMinute,
+                        lawObvious, lawAttractive, lawEasy, lawSatisfying,
+                        alternativeSuggestion, whyItMatters,
+                        createdAtEpochDay, archived, sortOrder,
+                        stackAnchorId, stackAnchorType, stackAnchorLabel,
+                        identityId, identityLabel
+                    )
+                    SELECT
+                        syncId, name, '⭐', '#7C6CF0', 'SELF_DEVELOPMENT', type, 0,
+                        127, timeOfDay, 0, 9, 0,
+                        '', '', '', '',
+                        alternativeSuggestion, whyItMatters,
+                        createdAtEpochDay, archived, 0,
+                        '', '', '',
+                        '', ''
+                    FROM anchor_habits
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -177,7 +217,7 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-                        MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11
+                        MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12
                     )
                     .build()
                 INSTANCE = instance
