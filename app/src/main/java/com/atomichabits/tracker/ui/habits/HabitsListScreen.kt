@@ -200,14 +200,15 @@ fun HabitsListScreen(
             type = dialogType,
             existing = null,
             onDismiss = { addDialogType = null },
-            onSave = { name, alternative ->
+            onSave = { name, alternative, why ->
                 scope.launch {
                     app.anchorRepository.save(
                         AnchorHabit(
                             name = name,
                             type = dialogType,
                             createdAtEpochDay = LocalDate.now().toEpochDay(),
-                            alternativeSuggestion = alternative
+                            alternativeSuggestion = alternative,
+                            whyItMatters = why
                         )
                     )
                 }
@@ -222,10 +223,10 @@ fun HabitsListScreen(
             type = anchorBeingEdited.type,
             existing = anchorBeingEdited,
             onDismiss = { editingAnchor = null },
-            onSave = { name, alternative ->
+            onSave = { name, alternative, why ->
                 scope.launch {
                     app.anchorRepository.save(
-                        anchorBeingEdited.copy(name = name, alternativeSuggestion = alternative)
+                        anchorBeingEdited.copy(name = name, alternativeSuggestion = alternative, whyItMatters = why)
                     )
                 }
                 editingAnchor = null
@@ -351,6 +352,14 @@ private fun TrackedHabitRow(habit: Habit, isDragging: Boolean = false, onClick: 
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
                 }
+                if (habit.identityLabel.isNotBlank()) {
+                    Text(
+                        "\uD83E\uDDE9 " + habit.identityLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
             }
         }
     }
@@ -384,6 +393,13 @@ private fun AnchorRow(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
+                if (anchor.whyItMatters.isNotBlank()) {
+                    Text(
+                        "\uD83C\uDFAF " + anchor.whyItMatters,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
                 if (impulseScore != null) {
                     Text(
                         "\u26A1 ${impulseScore.first}:${impulseScore.second}",
@@ -410,16 +426,17 @@ private fun AnchorEditDialog(
     type: String,
     existing: AnchorHabit?,
     onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit
+    onSave: (String, String, String) -> Unit
 ) {
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var alternative by remember { mutableStateOf(existing?.alternativeSuggestion ?: "") }
+    var whyItMatters by remember { mutableStateOf(existing?.whyItMatters ?: "") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(
-                onClick = { if (name.isNotBlank()) onSave(name.trim(), alternative.trim()) },
+                onClick = { if (name.isNotBlank()) onSave(name.trim(), alternative.trim(), whyItMatters.trim()) },
                 enabled = name.isNotBlank()
             ) {
                 Text(stringResource(R.string.save))
@@ -444,6 +461,14 @@ private fun AnchorEditDialog(
                         onValueChange = { alternative = it },
                         label = { Text(stringResource(R.string.anchors_alternative_label)) },
                         placeholder = { Text(stringResource(R.string.anchors_alternative_hint)) },
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = whyItMatters,
+                        onValueChange = { whyItMatters = it },
+                        label = { Text(stringResource(R.string.anchors_why_label)) },
+                        placeholder = { Text(stringResource(R.string.anchors_why_hint)) },
                         minLines = 2,
                         modifier = Modifier.fillMaxWidth()
                     )

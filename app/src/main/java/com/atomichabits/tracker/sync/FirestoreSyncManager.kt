@@ -132,6 +132,7 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
             "createdAtEpochDay" to anchor.createdAtEpochDay,
             "archived" to anchor.archived,
             "alternativeSuggestion" to anchor.alternativeSuggestion,
+            "whyItMatters" to anchor.whyItMatters,
             "updatedAt" to FieldValue.serverTimestamp()
         )
         anchorsRef(uid).document(anchor.syncId).set(data, SetOptions.merge())
@@ -275,7 +276,8 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
                     type = doc.getString("type") ?: "USEFUL",
                     createdAtEpochDay = doc.getLong("createdAtEpochDay") ?: LocalDate.now().toEpochDay(),
                     archived = doc.getBoolean("archived") ?: false,
-                    alternativeSuggestion = doc.getString("alternativeSuggestion") ?: ""
+                    alternativeSuggestion = doc.getString("alternativeSuggestion") ?: "",
+                    whyItMatters = doc.getString("whyItMatters") ?: ""
                 )
             )
         }

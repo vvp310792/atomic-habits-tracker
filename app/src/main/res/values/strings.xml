@@ -77,6 +77,8 @@
     <string name="anchors_name_label">Название</string>
     <string name="anchors_alternative_label">Альтернатива (необязательно)</string>
     <string name="anchors_alternative_hint">Что сделать вместо этого?</string>
+    <string name="anchors_why_label">Почему это важно для меня (необязательно)</string>
+    <string name="anchors_why_hint">Например: «Хочу быть внимательным отцом по вечерам»</string>
 
     <!-- 4 laws of James Clear -->
     <string name="laws_title">4 закона атомных привычек</string>

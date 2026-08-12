@@ -94,6 +94,7 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
 
     val canCheck = secondsLeft <= 0 && linkedAnchorId != null
     val linkedAlternative = harmful.find { it.syncId == linkedAnchorId }?.alternativeSuggestion.orEmpty()
+    val linkedWhyItMatters = harmful.find { it.syncId == linkedAnchorId }?.whyItMatters.orEmpty()
 
     Scaffold(
         topBar = {
@@ -145,6 +146,16 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
                                 selected = linkedAnchorId == "",
                                 onClick = { linkedAnchorId = ""; linkedAnchorLabel = "" },
                                 label = { Text(stringResource(R.string.impulse_no_link)) }
+                            )
+                        }
+                    }
+
+                    if (linkedWhyItMatters.isNotBlank()) {
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                            Text(
+                                "\uD83C\uDFAF " + linkedWhyItMatters,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(12.dp)
                             )
                         }
                     }
@@ -216,6 +227,15 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
                         }
                     }
                 } else {
+                    if (linkedWhyItMatters.isNotBlank()) {
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                            Text(
+                                "\uD83C\uDFAF " + linkedWhyItMatters,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
                     if (linkedAlternative.isNotBlank()) {
                         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                             Text(

@@ -16,6 +16,12 @@ import androidx.room.PrimaryKey
  * [alternativeSuggestion] is only meaningful for HARMFUL entries: a concrete "do
  * this instead" action (e.g. "Выпить стакан воды"), shown as a suggestion on the
  * Impulse screen when this habit is linked to an urge.
+ *
+ * [whyItMatters] is also HARMFUL-only: Kelly McGonigal's "I want" power (from
+ * "The Willpower Instinct") - the deeper motivation behind resisting, distinct
+ * from momentary willpower ("I will"/"I won't"). E.g. "Хочу быть внимательным
+ * отцом по вечерам". Shown alongside the alternative on the Impulse screen to
+ * reconnect with the actual reason in the moment of temptation, not just grit.
  */
 @Entity(tableName = "anchor_habits", indices = [Index(value = ["syncId"], unique = true)])
 data class AnchorHabit(
@@ -25,5 +31,6 @@ data class AnchorHabit(
     val type: String = "USEFUL", // "USEFUL" | "HARMFUL" | "NEUTRAL" | "DESIRED"
     val createdAtEpochDay: Long = 0,
     val archived: Boolean = false,
-    val alternativeSuggestion: String = ""
+    val alternativeSuggestion: String = "",
+    val whyItMatters: String = ""
 )
