@@ -4,6 +4,7 @@ import android.app.Application
 import com.atomichabits.tracker.data.AnchorRepository
 import com.atomichabits.tracker.data.AppDatabase
 import com.atomichabits.tracker.data.HabitRepository
+import com.atomichabits.tracker.data.IdentityRepository
 import com.atomichabits.tracker.data.ImpulseRepository
 import com.atomichabits.tracker.notifications.NotificationHelper
 import com.atomichabits.tracker.sync.AuthManager
@@ -40,6 +41,14 @@ class HabitTrackerApp : Application() {
     val impulseRepository: ImpulseRepository by lazy {
         ImpulseRepository(
             database.impulseLogDao(),
+            syncManager = syncManager,
+            currentUid = { authManager.currentUser?.uid }
+        )
+    }
+
+    val identityRepository: IdentityRepository by lazy {
+        IdentityRepository(
+            database.identityDao(),
             syncManager = syncManager,
             currentUid = { authManager.currentUser?.uid }
         )

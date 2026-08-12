@@ -5,6 +5,7 @@ import com.atomichabits.tracker.data.AnchorHabit
 import com.atomichabits.tracker.data.AppDatabase
 import com.atomichabits.tracker.data.Habit
 import com.atomichabits.tracker.data.HabitLog
+import com.atomichabits.tracker.data.Identity
 import com.atomichabits.tracker.data.ImpulseLog
 import com.atomichabits.tracker.notifications.ReminderScheduler
 import com.google.firebase.firestore.DocumentChange
@@ -36,12 +37,14 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
     private var logsListener: ListenerRegistration? = null
     private var anchorsListener: ListenerRegistration? = null
     private var impulsesListener: ListenerRegistration? = null
+    private var identitiesListener: ListenerRegistration? = null
     private val scope = CoroutineScope(Dispatchers.IO)
 
     private fun habitsRef(uid: String) = db.collection("users").document(uid).collection("habits")
     private fun logsRef(uid: String) = db.collection("users").document(uid).collection("logs")
     private fun anchorsRef(uid: String) = db.collection("users").document(uid).collection("anchors")
     private fun impulsesRef(uid: String) = db.collection("users").document(uid).collection("impulses")
+    private fun identitiesRef(uid: String) = db.collection("users").document(uid).collection("identities")
 
     /** Attaches realtime listeners for [uid]'s data. Call on sign-in. Safe to call again to re-attach. */
     fun start(uid: String) {
@@ -62,6 +65,10 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
             val changes = snapshot?.documentChanges ?: return@addSnapshotListener
             scope.launch { mergeImpulseChanges(changes) }
         }
+        identitiesListener = identitiesRef(uid).addSnapshotListener { snapshot, _ ->
+            val changes = snapshot?.documentChanges ?: return@addSnapshotListener
+            scope.launch { mergeIdentityChanges(changes) }
+        }
     }
 
     /** Detaches listeners. Call on sign-out. */
@@ -70,10 +77,12 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
         logsListener?.remove()
         anchorsListener?.remove()
         impulsesListener?.remove()
+        identitiesListener?.remove()
         habitsListener = null
         logsListener = null
         anchorsListener = null
         impulsesListener = null
+        identitiesListener = null
     }
 
     fun pushHabit(uid: String, habit: Habit) {
@@ -97,9 +106,22 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
             "sortOrder" to habit.sortOrder,
             "stackAnchorType" to habit.stackAnchorType,
             "stackAnchorLabel" to habit.stackAnchorLabel,
+            "identityId" to habit.identityId,
+            "identityLabel" to habit.identityLabel,
             "updatedAt" to FieldValue.serverTimestamp()
         )
         habitsRef(uid).document(habit.syncId).set(data, SetOptions.merge())
+    }
+
+    fun pushIdentity(uid: String, identity: Identity) {
+        if (identity.syncId.isBlank()) return
+        val data = mapOf(
+            "statement" to identity.statement,
+            "createdAtEpochDay" to identity.createdAtEpochDay,
+            "archived" to identity.archived,
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        identitiesRef(uid).document(identity.syncId).set(data, SetOptions.merge())
     }
 
     fun pushAnchor(uid: String, anchor: AnchorHabit) {
@@ -158,6 +180,7 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
         }
         database.anchorHabitDao().getAllOnce().forEach { anchor -> pushAnchor(uid, anchor) }
         database.impulseLogDao().getAllOnce().forEach { log -> pushImpulseLog(uid, log) }
+        database.identityDao().getAllOnce().forEach { identity -> pushIdentity(uid, identity) }
     }
 
     private suspend fun mergeHabitChanges(changes: List<DocumentChange>) {
@@ -193,7 +216,9 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
                 sortOrder = (doc.getLong("sortOrder"))?.toInt() ?: existing?.sortOrder ?: 0,
                 stackAnchorId = doc.getString("stackAnchorId") ?: "",
                 stackAnchorType = doc.getString("stackAnchorType") ?: "",
-                stackAnchorLabel = doc.getString("stackAnchorLabel") ?: ""
+                stackAnchorLabel = doc.getString("stackAnchorLabel") ?: "",
+                identityId = doc.getString("identityId") ?: "",
+                identityLabel = doc.getString("identityLabel") ?: ""
             )
             val newLocalId = habitDao.upsert(habit)
             val localId = existing?.id ?: newLocalId
@@ -274,6 +299,26 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
                     note = doc.getString("note") ?: "",
                     linkedHarmfulAnchorId = doc.getString("linkedHarmfulAnchorId") ?: "",
                     linkedHarmfulAnchorLabel = doc.getString("linkedHarmfulAnchorLabel") ?: ""
+                )
+            )
+        }
+    }
+
+    private suspend fun mergeIdentityChanges(changes: List<DocumentChange>) {
+        val identityDao = database.identityDao()
+        changes.forEach { change ->
+            if (change.type == DocumentChange.Type.REMOVED) return@forEach
+            val doc = change.document
+            val syncId = doc.id
+            val statement = doc.getString("statement") ?: return@forEach
+            val existing = identityDao.getBySyncId(syncId)
+            identityDao.upsert(
+                Identity(
+                    id = existing?.id ?: 0,
+                    syncId = syncId,
+                    statement = statement,
+                    createdAtEpochDay = doc.getLong("createdAtEpochDay") ?: LocalDate.now().toEpochDay(),
+                    archived = doc.getBoolean("archived") ?: false
                 )
             )
         }

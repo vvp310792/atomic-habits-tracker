@@ -1,5 +1,6 @@
 package com.atomichabits.tracker.ui.addedit
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +15,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -87,9 +89,13 @@ fun AddEditHabitScreen(
     var showTimePicker by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showStackPicker by remember { mutableStateOf(false) }
+    var identityId by remember { mutableStateOf("") }
+    var identityLabel by remember { mutableStateOf("") }
+    var showIdentityPicker by remember { mutableStateOf(false) }
 
     val allHabits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
     val allAnchors by app.anchorRepository.observeActive().collectAsState(initial = emptyList())
+    val allIdentities by app.identityRepository.observeActive().collectAsState(initial = emptyList())
     val stackableAnchors = allAnchors.filter { it.type != "DESIRED" }
     val stackableHabits = allHabits.filter { it.id != id }
 
@@ -115,6 +121,8 @@ fun AddEditHabitScreen(
                 stackAnchorId = h.stackAnchorId
                 stackAnchorType = h.stackAnchorType
                 stackAnchorLabel = h.stackAnchorLabel
+                identityId = h.identityId
+                identityLabel = h.identityLabel
             }
         }
     }
@@ -138,7 +146,9 @@ fun AddEditHabitScreen(
         createdAtEpochDay = createdAtEpochDay,
         stackAnchorId = stackAnchorId,
         stackAnchorType = stackAnchorType,
-        stackAnchorLabel = stackAnchorLabel
+        stackAnchorLabel = stackAnchorLabel,
+        identityId = identityId,
+        identityLabel = identityLabel
     )
 
     Scaffold(
@@ -237,6 +247,16 @@ fun AddEditHabitScreen(
                 }
             }
 
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.field_identity), style = MaterialTheme.typography.labelLarge)
+                TextButton(onClick = { showIdentityPicker = true }) {
+                    Text(
+                        if (identityId.isBlank()) stringResource(R.string.field_identity_none)
+                        else identityLabel
+                    )
+                }
+            }
+
             Text(stringResource(R.string.laws_title), style = MaterialTheme.typography.titleLarge)
 
             LawSection(
@@ -324,6 +344,75 @@ fun AddEditHabitScreen(
                     }
                 }
                 showStackPicker = false
+            }
+        )
+    }
+
+    if (showIdentityPicker) {
+        var newStatement by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showIdentityPicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (newStatement.isNotBlank()) {
+                            scope.launch {
+                                val newId = app.identityRepository.save(
+                                    com.atomichabits.tracker.data.Identity(
+                                        statement = newStatement.trim(),
+                                        createdAtEpochDay = LocalDate.now().toEpochDay()
+                                    )
+                                )
+                                app.database.identityDao().getAllOnce().find { it.id == newId }?.let {
+                                    identityId = it.syncId
+                                    identityLabel = it.statement
+                                }
+                            }
+                            showIdentityPicker = false
+                        }
+                    },
+                    enabled = newStatement.isNotBlank()
+                ) { Text(stringResource(R.string.identity_add)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showIdentityPicker = false }) { Text(stringResource(R.string.cancel)) }
+            },
+            title = { Text(stringResource(R.string.field_identity)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        stringResource(R.string.field_identity_none),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { identityId = ""; identityLabel = ""; showIdentityPicker = false }
+                            .padding(vertical = 10.dp)
+                    )
+                    allIdentities.forEach { identity ->
+                        Text(
+                            "\uD83E\uDDE9 " + identity.statement,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    identityId = identity.syncId
+                                    identityLabel = identity.statement
+                                    showIdentityPicker = false
+                                }
+                                .padding(vertical = 10.dp)
+                        )
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    OutlinedTextField(
+                        value = newStatement,
+                        onValueChange = { newStatement = it },
+                        label = { Text(stringResource(R.string.identity_statement_label)) },
+                        placeholder = { Text(stringResource(R.string.identity_statement_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         )
     }

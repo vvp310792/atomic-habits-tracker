@@ -6,10 +6,17 @@ import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChecklistRtl
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -42,6 +49,7 @@ import androidx.core.content.ContextCompat
 import com.atomichabits.tracker.BuildConfig
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
+import com.atomichabits.tracker.data.Identity
 import com.atomichabits.tracker.update.ApkInstaller
 import com.atomichabits.tracker.update.UpdateCheckResult
 import com.atomichabits.tracker.update.UpdateChecker
@@ -49,12 +57,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
+fun SettingsScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null, onOpenScorecard: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    val identities by app.identityRepository.observeActive().collectAsState(initial = emptyList())
+    var showAddIdentity by remember { mutableStateOf(false) }
 
     var currentUserEmail by remember { mutableStateOf(app.authManager.currentUser?.email) }
     var authBusy by remember { mutableStateOf(false) }
@@ -106,9 +118,55 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
         Column(
             modifier = Modifier
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(stringResource(R.string.identity_section), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.identity_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                identities.forEach { identity ->
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "\uD83E\uDDE9 " + identity.statement,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(onClick = { scope.launch { app.identityRepository.archive(identity.id) } }) {
+                                Icon(Icons.Filled.Delete, contentDescription = null)
+                            }
+                        }
+                    }
+                }
+                OutlinedButton(onClick = { showAddIdentity = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.identity_add))
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(stringResource(R.string.scorecard_section), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.scorecard_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                Button(onClick = onOpenScorecard, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.ChecklistRtl, contentDescription = null)
+                    Text(" " + stringResource(R.string.scorecard_open), modifier = Modifier.padding(start = 6.dp))
+                }
+            }
+
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.settings_account_section), style = MaterialTheme.typography.titleMedium)
 
@@ -308,5 +366,41 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
                 }
             }
         }
+    }
+
+    if (showAddIdentity) {
+        var statement by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showAddIdentity = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (statement.isNotBlank()) {
+                            scope.launch {
+                                app.identityRepository.save(
+                                    Identity(statement = statement.trim(), createdAtEpochDay = LocalDate.now().toEpochDay())
+                                )
+                            }
+                            showAddIdentity = false
+                        }
+                    },
+                    enabled = statement.isNotBlank()
+                ) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddIdentity = false }) { Text(stringResource(R.string.cancel)) }
+            },
+            title = { Text(stringResource(R.string.identity_add)) },
+            text = {
+                OutlinedTextField(
+                    value = statement,
+                    onValueChange = { statement = it },
+                    label = { Text(stringResource(R.string.identity_statement_label)) },
+                    placeholder = { Text(stringResource(R.string.identity_statement_hint)) },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        )
     }
 }

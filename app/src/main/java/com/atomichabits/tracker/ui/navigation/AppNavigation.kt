@@ -8,7 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +37,7 @@ import com.atomichabits.tracker.ui.habits.HabitsListScreen
 import com.atomichabits.tracker.ui.history.HistoryScreen
 import com.atomichabits.tracker.ui.home.HomeScreen
 import com.atomichabits.tracker.ui.impulse.ImpulseScreen
+import com.atomichabits.tracker.ui.scorecard.ScorecardScreen
 import com.atomichabits.tracker.ui.settings.SettingsScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -49,6 +50,7 @@ object Routes {
     const val ADD_EDIT = "add_edit"
     const val DETAIL = "detail"
     const val IMPULSE = "impulse"
+    const val SCORECARD = "scorecard"
     const val ARG_HABIT_ID = "habitId"
     const val ARG_INITIAL_NAME = "initialName"
 
@@ -72,7 +74,7 @@ private val BOTTOM_TABS = listOf(
     BottomTab(Routes.HABITS, "Привычки", Icons.Filled.Bolt),
     BottomTab(Routes.IMPULSE, "Позыв", Icons.Filled.Bolt, emphasized = true),
     BottomTab(Routes.HISTORY, "История", Icons.Filled.History),
-    BottomTab(Routes.SETTINGS, "Настройки", Icons.Filled.Settings)
+    BottomTab(Routes.SETTINGS, "Я", Icons.Filled.Person)
 )
 
 @Composable
@@ -155,7 +157,15 @@ fun AppNavigation(app: HabitTrackerApp) {
             }
 
             composable(Routes.SETTINGS) {
-                SettingsScreen(app = app, onBack = null)
+                SettingsScreen(
+                    app = app,
+                    onBack = null,
+                    onOpenScorecard = { navController.navigate(Routes.SCORECARD) }
+                )
+            }
+
+            composable(Routes.SCORECARD) {
+                ScorecardScreen(app = app, onBack = { navController.popBackStack() })
             }
 
             composable(

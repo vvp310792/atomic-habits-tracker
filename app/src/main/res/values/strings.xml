@@ -52,6 +52,8 @@
     <string name="field_reminder">Напоминание</string>
     <string name="field_reminder_time">Время напоминания</string>
     <string name="field_stack">Привычка-стек</string>
+    <string name="field_identity">Идентичность</string>
+    <string name="field_identity_none">Без привязки</string>
     <string name="field_stack_selected">После: %1$s</string>
     <string name="save">Сохранить</string>
     <string name="delete">Удалить</string>
@@ -67,6 +69,7 @@
     <string name="anchors_title">Библиотека привычек</string>
     <string name="anchors_hint">Уже сложившиеся привычки — точки, к которым можно «прикрепить» новую по формуле Клира: «После X я делаю Y».</string>
     <string name="anchors_useful">Полезные привычки</string>
+    <string name="anchors_neutral">Нейтральные привычки</string>
     <string name="anchors_desired">Желаемые привычки</string>
     <string name="anchors_harmful">Вредные привычки</string>
     <string name="anchors_empty">Пока пусто — нажмите «+»</string>
@@ -95,6 +98,28 @@
 
     <!-- Settings -->
     <string name="settings_title">Настройки</string>
+    <!-- Identity-based habits -->
+    <string name="identity_section">Идентичность</string>
+    <string name="identity_hint">Каждое выполнение привычки — голос за то, кем вы становитесь</string>
+    <string name="identity_add">Добавить идентичность</string>
+    <string name="identity_statement_label">Кем я становлюсь</string>
+    <string name="identity_statement_hint">Например: «Я — человек, который заботится о теле»</string>
+
+    <!-- Habit Scorecard -->
+    <string name="scorecard_section">Карта привычек</string>
+    <string name="scorecard_hint">Честная инвентаризация ваших ежедневных действий — без осуждения</string>
+    <string name="scorecard_open">Пройти карту привычек</string>
+    <string name="scorecard_title">Карта привычек</string>
+    <string name="scorecard_instructions">Вспомните свой обычный день от подъёма до сна. Перечисляйте действия и рутины одно за другим и отмечайте: полезное, нейтральное или вредное. Без осуждения — просто честная инвентаризация.</string>
+    <string name="scorecard_entry_label">Действие или рутина</string>
+    <string name="scorecard_entry_hint">Например: «Проверяю телефон утром»</string>
+    <string name="scorecard_positive">+ Полезно</string>
+    <string name="scorecard_neutral">= Нейтрально</string>
+    <string name="scorecard_negative">– Вредно</string>
+    <string name="scorecard_add">Добавить</string>
+    <string name="scorecard_session_title">Добавлено сейчас: %1$d</string>
+    <string name="scorecard_done">Готово</string>
+
     <string name="settings_account_section">Аккаунт и синхронизация</string>
     <string name="settings_account_hint">Войдите, чтобы привычки и история сохранялись в облаке и восстанавливались после переустановки приложения.</string>
     <string name="settings_account_email_label">Email</string>

@@ -74,6 +74,7 @@ fun HabitsListScreen(
     val scope = rememberCoroutineScope()
 
     val useful = anchors.filter { it.type == "USEFUL" }
+    val neutral = anchors.filter { it.type == "NEUTRAL" }
     val desired = anchors.filter { it.type == "DESIRED" }
     val harmful = anchors.filter { it.type == "HARMFUL" }
 
@@ -129,6 +130,23 @@ fun HabitsListScreen(
                 item { EmptyHint(stringResource(R.string.anchors_empty)) }
             } else {
                 items(useful, key = { "u${it.id}" }) { anchor ->
+                    AnchorRow(
+                        anchor,
+                        onDelete = { scope.launch { app.anchorRepository.archive(anchor.id) } },
+                        onClick = { editingAnchor = anchor }
+                    )
+                    Spacer(Modifier.size(8.dp))
+                }
+            }
+
+            item {
+                Spacer(Modifier.size(16.dp))
+                SectionTitle(stringResource(R.string.anchors_neutral), onAdd = { addDialogType = "NEUTRAL" })
+            }
+            if (neutral.isEmpty()) {
+                item { EmptyHint(stringResource(R.string.anchors_empty)) }
+            } else {
+                items(neutral, key = { "n${it.id}" }) { anchor ->
                     AnchorRow(
                         anchor,
                         onDelete = { scope.launch { app.anchorRepository.archive(anchor.id) } },

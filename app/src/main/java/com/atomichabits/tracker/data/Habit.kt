@@ -38,6 +38,11 @@ import androidx.room.PrimaryKey
  * "ANCHOR" or "HABIT" ("" = not stacked onto anything). [stackAnchorLabel] is a
  * cached copy of the anchor's display name, so the chain still reads sensibly
  * even if the anchor is later renamed or removed.
+ *
+ * [identityId] optionally links this habit to an [Identity] (James Clear's
+ * identity-based habits) - each completion of the habit counts as a "vote"
+ * for that identity. [identityLabel] caches the statement text for display,
+ * same pattern as [stackAnchorLabel].
  */
 @Entity(tableName = "habits", indices = [Index(value = ["syncId"], unique = true)])
 data class Habit(
@@ -61,5 +66,7 @@ data class Habit(
     val sortOrder: Int = 0,
     val stackAnchorId: String = "",
     val stackAnchorType: String = "",
-    val stackAnchorLabel: String = ""
+    val stackAnchorLabel: String = "",
+    val identityId: String = "",
+    val identityLabel: String = ""
 )
