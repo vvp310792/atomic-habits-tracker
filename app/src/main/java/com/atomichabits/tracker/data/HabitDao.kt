@@ -42,6 +42,12 @@ interface HabitDao {
     @Query("UPDATE habits SET sortOrder = :order WHERE id = :habitId")
     suspend fun updateSortOrder(habitId: Long, order: Int)
 
+    @Query("SELECT * FROM habits WHERE identityId = :identityId")
+    suspend fun getByIdentityId(identityId: String): List<Habit>
+
+    @Query("UPDATE habits SET identityLabel = :label WHERE identityId = :identityId")
+    suspend fun updateIdentityLabel(identityId: String, label: String)
+
     @Delete
     suspend fun delete(habit: Habit)
 }

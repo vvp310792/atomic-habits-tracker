@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Today
@@ -81,7 +82,7 @@ private data class BottomTab(
 
 private val BOTTOM_TABS = listOf(
     BottomTab(Routes.HOME, "Сегодня", Icons.Filled.Today),
-    BottomTab(Routes.HABITS, "Привычки", Icons.Filled.Bolt),
+    BottomTab(Routes.HABITS, "Привычки", Icons.Filled.CheckCircle),
     BottomTab(Routes.IMPULSE, "Позыв", Icons.Filled.Bolt, emphasized = true),
     BottomTab(Routes.HISTORY, "История", Icons.Filled.History),
     BottomTab(Routes.SETTINGS, "Я", Icons.Filled.Person)

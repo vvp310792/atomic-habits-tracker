@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChecklistRtl
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -67,6 +68,8 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null, onOpenSco
 
     val identities by app.identityRepository.observeActive().collectAsState(initial = emptyList())
     var showAddIdentity by remember { mutableStateOf(false) }
+    var editingIdentity by remember { mutableStateOf<Identity?>(null) }
+    var editIdentityText by remember { mutableStateOf("") }
 
     var currentUserEmail by remember { mutableStateOf(app.authManager.currentUser?.email) }
     var authBusy by remember { mutableStateOf(false) }
@@ -143,6 +146,12 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null, onOpenSco
                                 style = MaterialTheme.typography.bodyLarge,
                                 modifier = Modifier.weight(1f)
                             )
+                            IconButton(onClick = {
+                                editingIdentity = identity
+                                editIdentityText = identity.statement
+                            }) {
+                                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.identity_rename))
+                            }
                             IconButton(onClick = { scope.launch { app.identityRepository.archive(identity.id) } }) {
                                 Icon(Icons.Filled.Delete, contentDescription = null)
                             }
@@ -397,6 +406,40 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null, onOpenSco
                     onValueChange = { statement = it },
                     label = { Text(stringResource(R.string.identity_statement_label)) },
                     placeholder = { Text(stringResource(R.string.identity_statement_hint)) },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        )
+    }
+
+    editingIdentity?.let { target ->
+        AlertDialog(
+            onDismissRequest = { editingIdentity = null },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val newStatement = editIdentityText.trim()
+                        if (newStatement.isNotBlank()) {
+                            scope.launch {
+                                app.identityRepository.save(target.copy(statement = newStatement))
+                                app.repository.renameIdentityLabel(target.syncId, newStatement)
+                            }
+                            editingIdentity = null
+                        }
+                    },
+                    enabled = editIdentityText.isNotBlank()
+                ) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingIdentity = null }) { Text(stringResource(R.string.cancel)) }
+            },
+            title = { Text(stringResource(R.string.identity_rename)) },
+            text = {
+                OutlinedTextField(
+                    value = editIdentityText,
+                    onValueChange = { editIdentityText = it },
+                    label = { Text(stringResource(R.string.identity_statement_label)) },
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth()
                 )

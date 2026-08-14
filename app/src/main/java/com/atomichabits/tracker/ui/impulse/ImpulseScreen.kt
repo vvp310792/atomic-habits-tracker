@@ -1,10 +1,7 @@
 package com.atomichabits.tracker.ui.impulse
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -309,18 +306,40 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
     }
 }
 
+/**
+ * Box/square breathing (4-4-4-4): inhale, hold, exhale, hold, each held for
+ * [PHASE_SECONDS]. The circle grows during inhale, stays put during both holds,
+ * shrinks during exhale - and the phase name is shown so the rhythm is legible,
+ * not just a shrinking/growing shape.
+ */
+private const val PHASE_SECONDS = 4
+private const val MIN_SCALE = 0.55f
+private const val MAX_SCALE = 1f
+
+private enum class BreathPhase(val label: String) {
+    INHALE("Вдох"),
+    HOLD_FULL("Задержка"),
+    EXHALE("Выдох"),
+    HOLD_EMPTY("Задержка")
+}
+
 @Composable
 private fun BreathingCircle(secondsLeft: Int, canCheck: Boolean) {
-    val transition = rememberInfiniteTransition(label = "breathing")
-    val scale by transition.animateFloat(
-        initialValue = 0.55f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scale"
-    )
+    val scale = remember { Animatable(MIN_SCALE) }
+    var phase by remember { mutableStateOf(BreathPhase.INHALE) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            phase = BreathPhase.INHALE
+            scale.animateTo(MAX_SCALE, tween(PHASE_SECONDS * 1000, easing = LinearEasing))
+            phase = BreathPhase.HOLD_FULL
+            delay(PHASE_SECONDS * 1000L)
+            phase = BreathPhase.EXHALE
+            scale.animateTo(MIN_SCALE, tween(PHASE_SECONDS * 1000, easing = LinearEasing))
+            phase = BreathPhase.HOLD_EMPTY
+            delay(PHASE_SECONDS * 1000L)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -338,15 +357,22 @@ private fun BreathingCircle(secondsLeft: Int, canCheck: Boolean) {
         )
         Box(
             modifier = Modifier
-                .size((200 * scale).dp)
+                .size((200 * scale.value).dp)
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), CircleShape)
         )
-        if (!canCheck) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                formatTime(secondsLeft),
-                style = MaterialTheme.typography.headlineMedium,
+                phase.label,
+                style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
+            if (!canCheck) {
+                Text(
+                    formatTime(secondsLeft),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
         }
     }
 }

@@ -52,6 +52,21 @@ class HabitRepository(
 
     suspend fun deleteHabit(habit: Habit) = habitDao.delete(habit)
 
+    /**
+     * Keeps every habit's cached [Habit.identityLabel] in sync when the linked
+     * [Identity]'s statement text is renamed - same "cached copy" pattern as
+     * [Habit.stackAnchorLabel], but proactively refreshed here since a rename is
+     * exactly the moment that cache would otherwise go stale.
+     */
+    suspend fun renameIdentityLabel(identityId: String, newLabel: String) {
+        if (identityId.isBlank()) return
+        habitDao.updateIdentityLabel(identityId, newLabel)
+        val uid = currentUid()
+        if (uid != null && syncManager != null) {
+            habitDao.getByIdentityId(identityId).forEach { pushHabitIfSignedIn(it) }
+        }
+    }
+
     /** Toggles completion for [habitId] on [date]. Returns the new completed state. */
     suspend fun toggleCompletion(habitId: Long, date: LocalDate): Boolean {
         val epochDay = date.toEpochDay()
