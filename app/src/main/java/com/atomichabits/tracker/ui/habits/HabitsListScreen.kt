@@ -126,6 +126,55 @@ fun HabitsListScreen(
     }
 }
 
+/**
+ * A "conveyor" of habits chained via habit stacking (Clear's "after X, I will Y"):
+ * [habits] is ordered root-first, each subsequent entry's [Habit.stackAnchorId] points
+ * at the syncId of the entry right before it. A chain of length 1 is just a normal,
+ * unstacked habit. Chains never cross a [Habit.timeOfDay] boundary - if the next link
+ * lives in a different time-of-day group it starts a new chain there instead.
+ */
+private data class HabitChain(val habits: List<Habit>) {
+    val rootId: Long get() = habits.first().id
+}
+
+/**
+ * Groups [habitsInGroup] (habits already filtered to one time-of-day bucket) into
+ * [HabitChain]s, preserving each chain's existing relative order (driven by sortOrder
+ * via the incoming list order). A habit only continues a chain if its anchor is another
+ * habit within this same group; an anchor outside the group is ignored here (the linked
+ * habit still renders, just as the root of its own chain) per the "chains don't cross
+ * time-of-day" rule.
+ *
+ * Defensive against bad/legacy data: at most one child is taken per parent (extra
+ * claimants become roots of their own chains), and a visited-set guards against cycles.
+ */
+private fun buildHabitChains(habitsInGroup: List<Habit>): List<HabitChain> {
+    val groupSyncIds = habitsInGroup.map { it.syncId }.toSet()
+    val childByParentSyncId = LinkedHashMap<String, Habit>()
+    habitsInGroup.forEach { h ->
+        if (h.stackAnchorId.isNotBlank() && h.stackAnchorId in groupSyncIds) {
+            childByParentSyncId.putIfAbsent(h.stackAnchorId, h)
+        }
+    }
+    val isChainedChild: (Habit) -> Boolean = { h ->
+        h.stackAnchorId.isNotBlank() && h.stackAnchorId in groupSyncIds &&
+            childByParentSyncId[h.stackAnchorId]?.id == h.id
+    }
+    val roots = habitsInGroup.filter { !isChainedChild(it) }
+    return roots.map { root ->
+        val chain = mutableListOf(root)
+        val visited = mutableSetOf(root.syncId)
+        var current = root
+        while (true) {
+            val next = childByParentSyncId[current.syncId] ?: break
+            if (!visited.add(next.syncId)) break
+            chain.add(next)
+            current = next
+        }
+        HabitChain(chain)
+    }
+}
+
 @Composable
 private fun ColoredQualitySection(
     title: String,
@@ -162,16 +211,56 @@ private fun ColoredQualitySection(
                 )
             } else {
                 val timeGroups = TIME_OF_DAY_VALUES.map { tod ->
-                    DragGroup(tod, timeOfDayLabel(tod), habits.filter { it.timeOfDay == tod })
+                    val chains = buildHabitChains(habits.filter { it.timeOfDay == tod })
+                    DragGroup(tod, timeOfDayLabel(tod), chains)
                 }
                 CrossGroupDraggableSections(
                     groups = timeGroups,
-                    itemKey = { it.id },
-                    onMove = { habit, _, toGroupKey -> onMove(habit, toGroupKey) },
-                    onReorder = { _, orderedItems -> onReorder(orderedItems) },
+                    itemKey = { it.rootId },
+                    onMove = { chain, _, toGroupKey ->
+                        // Dragging a chain across time-of-day moves every habit in it
+                        // together, so the conveyor stays intact in its new group.
+                        chain.habits.forEach { habit -> onMove(habit, toGroupKey) }
+                    },
+                    onReorder = { _, orderedChains -> onReorder(orderedChains.flatMap { it.habits }) },
                     emptyGroupHint = stringResource(R.string.home_group_empty_hint)
-                ) { habit, _ ->
-                    UniversalHabitRow(habit, impulseScoreByHabit[habit.syncId]) { onClick(habit) }
+                ) { chain, isDragging ->
+                    HabitChainBlock(chain, impulseScoreByHabit, isDragging, onClick)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Renders one [HabitChain] as a single visual block: each habit after the first is
+ * nested slightly and preceded by a small "↳" connector, so a stacked sequence reads
+ * as one conveyor at a glance instead of disconnected rows. A chain of length 1 looks
+ * exactly like a plain habit row (no connector, no indent).
+ */
+@Composable
+private fun HabitChainBlock(
+    chain: HabitChain,
+    impulseScoreByHabit: Map<String, Pair<Int, Int>>,
+    isDragging: Boolean,
+    onClick: (Habit) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        chain.habits.forEachIndexed { index, habit ->
+            if (index == 0) {
+                UniversalHabitRow(habit, impulseScoreByHabit[habit.syncId]) { onClick(habit) }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(Modifier.size(20.dp))
+                    Text(
+                        "\u21B3",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
+                    Box(modifier = Modifier.weight(1f)) {
+                        UniversalHabitRow(habit, impulseScoreByHabit[habit.syncId]) { onClick(habit) }
+                    }
                 }
             }
         }

@@ -102,7 +102,17 @@ fun AddEditHabitScreen(
 
     val allHabits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
     val allIdentities by app.identityRepository.observeActive().collectAsState(initial = emptyList())
-    val stackableHabits = allHabits.filter { it.id != id && it.qualityType != "DESIRED" }
+    // A stack anchor can have at most one habit chained onto it (habit-chain / "conveyor"
+    // rule): if some OTHER habit already points at a given syncId via stackAnchorId, that
+    // habit is excluded from the picker so it's impossible to create a second child for it.
+    val occupiedAnchorSyncIds = remember(allHabits, id) {
+        allHabits.filter { it.id != id && it.stackAnchorId.isNotBlank() }
+            .map { it.stackAnchorId }
+            .toSet()
+    }
+    val stackableHabits = allHabits.filter {
+        it.id != id && it.qualityType != "DESIRED" && it.syncId !in occupiedAnchorSyncIds
+    }
 
     var initialLoadDone by remember { mutableStateOf(habitId == null) }
 
