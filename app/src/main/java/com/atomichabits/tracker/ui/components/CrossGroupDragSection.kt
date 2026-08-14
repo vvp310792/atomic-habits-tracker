@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -103,6 +104,17 @@ fun <T> CrossGroupDraggableSections(
                     group.items.forEach { item ->
                         val key = itemKey(item)
                         val isDragging = draggedKey == key
+                        // Without an explicit key(), Compose matches these composables by
+                        // list POSITION, not by item identity. During a live drag the list
+                        // order changes on every shift, so a slot that held item A can end
+                        // up holding item B after a reorder step - and pointerInput(key)
+                        // then sees "key changed" for that slot and restarts its gesture
+                        // coroutine, breaking the in-progress drag instead of following the
+                        // item that's actually being dragged. Keying by item identity makes
+                        // the composable (and its ongoing gesture) follow the item itself
+                        // as it moves, which is what makes multi-position drags land the
+                        // order they visually showed instead of persisting a stale one.
+                        key(key) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -202,6 +214,7 @@ fun <T> CrossGroupDraggableSections(
                                 }
                         ) {
                             itemContent(item, isDragging)
+                        }
                         }
                         Spacer(Modifier.size(8.dp))
                     }
