@@ -161,13 +161,32 @@ fun <T> CrossGroupDraggableSections(
                                             }
 
                                             // Within-group live reorder (only while hovering original group).
-                                            if (hoverGroupKey == draggedFromGroup) {
+                                            // Target index is found by a real position hit-test against each
+                                            // item's own measured height (cumulative from the first item's slot),
+                                            // rather than dividing by the dragged item's height alone - items can
+                                            // be very different heights (e.g. a 1-habit vs a 3-habit stacked
+                                            // chain), and a single-height division under- or over-counts shifts
+                                            // in that case.
+                                            if (hoverGroupKey == draggedFromGroup && origin != null) {
                                                 val g = localGroups.find { it.key == draggedFromGroup }
                                                 val currentIndex = g?.items?.indexOfFirst { itemKey(it) == key } ?: -1
-                                                if (g != null && currentIndex >= 0) {
-                                                    val effectiveStepPx = (itemHeights[key] ?: fallbackRowHeightPx) + spacerPx
-                                                    val shift = (dragOffsetY / effectiveStepPx).roundToInt()
-                                                    val targetIndex = (currentIndex + shift).coerceIn(0, g.items.size - 1)
+                                                if (g != null && currentIndex >= 0 && g.items.isNotEmpty()) {
+                                                    val draggedHeight = itemHeights[key] ?: fallbackRowHeightPx
+                                                    val draggedCenterY = origin.y + dragOffsetY + draggedHeight / 2f
+                                                    val firstKey = itemKey(g.items.first())
+                                                    var cumulativeTop = itemOrigins[firstKey]?.y
+                                                        ?: groupBounds[g.key]?.top
+                                                        ?: origin.y
+                                                    var targetIndex = g.items.lastIndex
+                                                    for ((idx, listItem) in g.items.withIndex()) {
+                                                        val itemH = itemHeights[itemKey(listItem)] ?: fallbackRowHeightPx
+                                                        val itemBottom = cumulativeTop + itemH
+                                                        if (draggedCenterY < itemBottom) {
+                                                            targetIndex = idx
+                                                            break
+                                                        }
+                                                        cumulativeTop = itemBottom + spacerPx
+                                                    }
                                                     if (targetIndex != currentIndex) {
                                                         val newItems = g.items.toMutableList().apply {
                                                             add(targetIndex, removeAt(currentIndex))
@@ -175,7 +194,6 @@ fun <T> CrossGroupDraggableSections(
                                                         localGroups = localGroups.map {
                                                             if (it.key == g.key) it.copy(items = newItems) else it
                                                         }
-                                                        dragOffsetY -= shift * effectiveStepPx
                                                     }
                                                 }
                                             }
