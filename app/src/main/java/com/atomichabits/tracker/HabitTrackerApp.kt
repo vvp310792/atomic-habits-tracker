@@ -47,6 +47,19 @@ class HabitTrackerApp : Application() {
 
     private val appScope = CoroutineScope(Dispatchers.IO)
 
+    /**
+     * Launches persistence work (saves, reorders, moves) on an application-scoped
+     * coroutine rather than a screen's rememberCoroutineScope(). Using a screen-scoped
+     * coroutine for a DB write is a trap: navigating away cancels that scope, and if the
+     * user switches screens right after a drag-to-reorder, an in-flight multi-row
+     * sortOrder update (plus its Firestore push) can be cut off mid-write - the change
+     * looks applied for a moment, then reverts because it was never actually persisted.
+     * This outlives any single screen, so a launched write always finishes.
+     */
+    fun launchPersistent(block: suspend () -> Unit) {
+        appScope.launch { block() }
+    }
+
     /** True once we've done the one-time "push everything local" for the current sign-in. */
     private var didInitialPush = false
 

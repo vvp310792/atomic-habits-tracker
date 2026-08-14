@@ -29,7 +29,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +44,6 @@ import com.atomichabits.tracker.ui.components.HabitCard
 import com.atomichabits.tracker.util.TIME_OF_DAY_VALUES
 import com.atomichabits.tracker.util.isHabitScheduledOn
 import com.atomichabits.tracker.util.timeOfDayLabel
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -71,7 +69,6 @@ fun HomeScreen(
     val days = remember(weekMonday) { (0..6).map { weekMonday.plusDays(it.toLong()) } }
 
     val windowLogs by app.repository.observeLogsBetween(weekMonday, weekSunday).collectAsState(initial = emptyList())
-    val scope = rememberCoroutineScope()
 
     var selectedDate by remember { mutableStateOf(today) }
     var filter by remember { mutableStateOf("ALL") }
@@ -114,7 +111,7 @@ fun HomeScreen(
     }
 
     fun habitToggle(habit: Habit): () -> Unit = {
-        scope.launch { app.repository.toggleCompletion(habit.id, selectedDate) }
+        app.launchPersistent { app.repository.toggleCompletion(habit.id, selectedDate) }
     }
 
     Scaffold(
@@ -176,10 +173,10 @@ fun HomeScreen(
                     groups = visibleTimeGroups,
                     itemKey = { it.id },
                     onMove = { habit, _, toGroupKey ->
-                        scope.launch { app.repository.saveHabit(habit.copy(timeOfDay = toGroupKey)) }
+                        app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toGroupKey)) }
                     },
                     onReorder = { _, orderedItems ->
-                        scope.launch { app.repository.reorder(orderedItems.map { it.id }) }
+                        app.launchPersistent { app.repository.reorder(orderedItems.map { it.id }) }
                     },
                     emptyGroupHint = stringResource(R.string.home_group_empty_hint)
                 ) { habit, isDragging ->

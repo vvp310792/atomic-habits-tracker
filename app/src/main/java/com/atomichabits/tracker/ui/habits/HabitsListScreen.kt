@@ -30,7 +30,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,7 +43,6 @@ import com.atomichabits.tracker.ui.components.CrossGroupDraggableSections
 import com.atomichabits.tracker.ui.components.DragGroup
 import com.atomichabits.tracker.util.TIME_OF_DAY_VALUES
 import com.atomichabits.tracker.util.timeOfDayLabel
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,7 +54,6 @@ fun HabitsListScreen(
 ) {
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
     val impulseLogs by app.impulseRepository.observeAll().collectAsState(initial = emptyList())
-    val scope = rememberCoroutineScope()
 
     val greenHabits = habits.filter { it.qualityType == "USEFUL" }
     val yellowHabits = habits.filter { it.qualityType == "NEUTRAL" || it.qualityType == "DESIRED" }
@@ -91,8 +88,8 @@ fun HabitsListScreen(
                     habits = greenHabits,
                     impulseScoreByHabit = impulseScoreByHabit,
                     onAdd = { onAddHabit("USEFUL", true) },
-                    onMove = { habit, toTime -> scope.launch { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
-                    onReorder = { orderedItems -> scope.launch { app.repository.reorder(orderedItems.map { it.id }) } },
+                    onMove = { habit, toTime -> app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
+                    onReorder = { orderedItems -> app.launchPersistent { app.repository.reorder(orderedItems.map { it.id }) } },
                     onClick = ::rowClick
                 )
                 Spacer(Modifier.size(20.dp))
@@ -104,8 +101,8 @@ fun HabitsListScreen(
                     habits = yellowHabits,
                     impulseScoreByHabit = impulseScoreByHabit,
                     onAdd = { onAddHabit("DESIRED", false) },
-                    onMove = { habit, toTime -> scope.launch { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
-                    onReorder = { orderedItems -> scope.launch { app.repository.reorder(orderedItems.map { it.id }) } },
+                    onMove = { habit, toTime -> app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
+                    onReorder = { orderedItems -> app.launchPersistent { app.repository.reorder(orderedItems.map { it.id }) } },
                     onClick = ::rowClick
                 )
                 Spacer(Modifier.size(20.dp))
@@ -117,8 +114,8 @@ fun HabitsListScreen(
                     habits = redHabits,
                     impulseScoreByHabit = impulseScoreByHabit,
                     onAdd = { onAddHabit("HARMFUL", false) },
-                    onMove = { habit, toTime -> scope.launch { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
-                    onReorder = { orderedItems -> scope.launch { app.repository.reorder(orderedItems.map { it.id }) } },
+                    onMove = { habit, toTime -> app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
+                    onReorder = { orderedItems -> app.launchPersistent { app.repository.reorder(orderedItems.map { it.id }) } },
                     onClick = ::rowClick
                 )
             }
