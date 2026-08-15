@@ -13,6 +13,8 @@
     <string name="habits_section_yellow">Желаемые и нейтральные</string>
     <string name="habits_section_red">Вредные привычки</string>
     <string name="habits_not_tracked_badge">не отслеживается</string>
+    <string name="habits_mastery_done_badge">🎓 Освоено</string>
+    <string name="habits_mastery_progress_badge">%1$d%% к автоматизму</string>
     <string name="habits_reorder_hint">Зажмите карточку и перетащите, чтобы изменить порядок или время суток</string>
     <string name="history_title">История</string>
     <string name="history_tab_calendar">Календарь</string>
@@ -106,6 +108,11 @@
     <string name="detail_completion_rate">Выполнено</string>
     <string name="detail_chart_title">Последние 30 дней</string>
     <string name="detail_heatmap_title">Календарь</string>
+    <string name="detail_mastery_title">Прогресс освоения</string>
+    <string name="detail_mastery_percent">%1$d%%</string>
+    <string name="detail_mastery_done">🎓 Освоено</string>
+    <string name="detail_mastery_hint">За последние %1$d запланированных дней — нужно ≥80%%, чтобы привычка считалась освоенной</string>
+    <string name="detail_mastery_hint_not_enough_data">Пока недостаточно данных — нужно хотя бы 14 запланированных дней истории</string>
 
     <!-- Settings -->
     <string name="settings_title">Настройки</string>

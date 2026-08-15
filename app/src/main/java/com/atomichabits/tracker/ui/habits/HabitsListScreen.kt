@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.Habit
+import com.atomichabits.tracker.data.MasteryInfo
 import com.atomichabits.tracker.ui.components.CategoryTag
 import com.atomichabits.tracker.ui.components.CrossGroupDraggableSections
 import com.atomichabits.tracker.ui.components.DragGroup
@@ -54,6 +55,7 @@ fun HabitsListScreen(
 ) {
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
     val impulseLogs by app.impulseRepository.observeAll().collectAsState(initial = emptyList())
+    val allLogs by app.repository.observeAllLogs().collectAsState(initial = emptyList())
 
     val greenHabits = habits.filter { it.qualityType == "USEFUL" }
     val yellowHabits = habits.filter { it.qualityType == "NEUTRAL" || it.qualityType == "DESIRED" }
@@ -66,6 +68,19 @@ fun HabitsListScreen(
             .mapValues { (_, logs) ->
                 logs.count { it.outcome == "CHECK" } to logs.count { it.outcome == "CROSS" }
             }
+    }
+
+    // Habit-formation mastery progress per habit (see HabitRepository.computeMastery),
+    // computed here from the already-loaded log history rather than a DB round-trip
+    // per row.
+    val masteryByHabit = remember(habits, allLogs) {
+        val doneEpochDaysByHabitId = allLogs
+            .filter { it.completed }
+            .groupBy({ it.habitId }, { it.dateEpochDay })
+            .mapValues { it.value.toSet() }
+        habits
+            .filter { it.isTracked }
+            .associate { h -> h.syncId to app.repository.computeMastery(h, doneEpochDaysByHabitId[h.id].orEmpty()) }
     }
 
     fun rowClick(habit: Habit) {
@@ -87,6 +102,7 @@ fun HabitsListScreen(
                     tint = Color(0xFF3DBE8B),
                     habits = greenHabits,
                     impulseScoreByHabit = impulseScoreByHabit,
+                    masteryByHabit = masteryByHabit,
                     onAdd = { onAddHabit("USEFUL", true) },
                     onMove = { habit, toTime -> app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
                     onReorder = { orderedItems -> app.launchPersistent { app.repository.reorder(orderedItems.map { it.id }) } },
@@ -100,6 +116,7 @@ fun HabitsListScreen(
                     tint = Color(0xFFF2A93B),
                     habits = yellowHabits,
                     impulseScoreByHabit = impulseScoreByHabit,
+                    masteryByHabit = masteryByHabit,
                     onAdd = { onAddHabit("DESIRED", false) },
                     onMove = { habit, toTime -> app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
                     onReorder = { orderedItems -> app.launchPersistent { app.repository.reorder(orderedItems.map { it.id }) } },
@@ -113,6 +130,7 @@ fun HabitsListScreen(
                     tint = Color(0xFFEF6461),
                     habits = redHabits,
                     impulseScoreByHabit = impulseScoreByHabit,
+                    masteryByHabit = masteryByHabit,
                     onAdd = { onAddHabit("HARMFUL", false) },
                     onMove = { habit, toTime -> app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
                     onReorder = { orderedItems -> app.launchPersistent { app.repository.reorder(orderedItems.map { it.id }) } },
@@ -178,6 +196,7 @@ private fun ColoredQualitySection(
     tint: Color,
     habits: List<Habit>,
     impulseScoreByHabit: Map<String, Pair<Int, Int>>,
+    masteryByHabit: Map<String, MasteryInfo>,
     onAdd: () -> Unit,
     onMove: (Habit, String) -> Unit,
     onReorder: (List<Habit>) -> Unit,
@@ -222,7 +241,7 @@ private fun ColoredQualitySection(
                     onReorder = { _, orderedChains -> onReorder(orderedChains.flatMap { it.habits }) },
                     emptyGroupHint = stringResource(R.string.home_group_empty_hint)
                 ) { chain, isDragging ->
-                    HabitChainBlock(chain, impulseScoreByHabit, isDragging, onClick)
+                    HabitChainBlock(chain, impulseScoreByHabit, masteryByHabit, isDragging, onClick)
                 }
             }
         }
@@ -239,13 +258,14 @@ private fun ColoredQualitySection(
 private fun HabitChainBlock(
     chain: HabitChain,
     impulseScoreByHabit: Map<String, Pair<Int, Int>>,
+    masteryByHabit: Map<String, MasteryInfo>,
     isDragging: Boolean,
     onClick: (Habit) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         chain.habits.forEachIndexed { index, habit ->
             if (index == 0) {
-                UniversalHabitRow(habit, impulseScoreByHabit[habit.syncId]) { onClick(habit) }
+                UniversalHabitRow(habit, impulseScoreByHabit[habit.syncId], masteryByHabit[habit.syncId]) { onClick(habit) }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Spacer(Modifier.size(20.dp))
@@ -256,7 +276,7 @@ private fun HabitChainBlock(
                         modifier = Modifier.padding(end = 4.dp)
                     )
                     Box(modifier = Modifier.weight(1f)) {
-                        UniversalHabitRow(habit, impulseScoreByHabit[habit.syncId]) { onClick(habit) }
+                        UniversalHabitRow(habit, impulseScoreByHabit[habit.syncId], masteryByHabit[habit.syncId]) { onClick(habit) }
                     }
                 }
             }
@@ -265,7 +285,7 @@ private fun HabitChainBlock(
 }
 
 @Composable
-private fun UniversalHabitRow(habit: Habit, impulseScore: Pair<Int, Int>?, onClick: () -> Unit) {
+private fun UniversalHabitRow(habit: Habit, impulseScore: Pair<Int, Int>?, mastery: MasteryInfo?, onClick: () -> Unit) {
     val accent = remember(habit.colorHex) {
         runCatching { Color(android.graphics.Color.parseColor(habit.colorHex)) }
             .getOrDefault(Color(0xFF7C6CF0))
@@ -336,6 +356,21 @@ private fun UniversalHabitRow(habit: Habit, impulseScore: Pair<Int, Int>?, onCli
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
+                }
+                if (mastery != null && mastery.scheduledDays >= 14) {
+                    if (mastery.isMastered) {
+                        Text(
+                            stringResource(R.string.habits_mastery_done_badge),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        Text(
+                            stringResource(R.string.habits_mastery_progress_badge, mastery.progressPercent),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
                 }
             }
         }

@@ -97,8 +97,9 @@ class HabitRepository(
     }
 
     /**
-     * Computes (currentStreak, bestStreak, completionRatePercent over last 30 days)
-     * from the full log history of a habit, respecting its active days-of-week.
+     * Computes (currentStreak, bestStreak, completionRatePercent over last 30 days,
+     * mastery progress) from the full log history of a habit, respecting its
+     * active days-of-week.
      */
     suspend fun computeStats(habit: Habit): HabitStats {
         val logs = habitLogDao.getAllForHabitOnce(habit.id)
@@ -144,7 +145,54 @@ class HabitRepository(
         }
         val rate = if (scheduled == 0) 0 else (done * 100 / scheduled)
 
-        return HabitStats(currentStreak = current, bestStreak = best, completionRatePercent = rate)
+        val mastery = computeMastery(habit, completedDays)
+
+        return HabitStats(
+            currentStreak = current,
+            bestStreak = best,
+            completionRatePercent = rate,
+            masteryProgressPercent = mastery.progressPercent,
+            masteryScheduledDays = mastery.scheduledDays,
+            isMastered = mastery.isMastered
+        )
+    }
+
+    /**
+     * Habit-formation "mastery" progress, per the neuroscience discussion this is
+     * modelled on (Lally et al. 2010: median ~66 days to automaticity, range
+     * 18-254; a single missed day barely moves the curve, but the overall
+     * completion RATE over a long window is what predicts automaticity - not an
+     * unbroken streak). A habit counts as mastered once it's hit at least
+     * [MASTERY_THRESHOLD_PERCENT]% of its own scheduled days (only days it was
+     * actually due, per [isActiveOn]) over the last [MASTERY_WINDOW_DAYS] days -
+     * or its whole lifetime if younger than that window - provided there's been
+     * enough opportunity to judge it ([MASTERY_MIN_SCHEDULED_DAYS] scheduled days
+     * minimum, so a habit can't be declared "mastered" after 3 lucky days).
+     *
+     * This is a plain (non-suspend) function, callable both from [computeStats]
+     * (which already has the log history) and directly from a UI layer that has
+     * already loaded all logs itself (e.g. for showing progress across a whole
+     * list of habits without a DB round-trip per row).
+     */
+    fun computeMastery(habit: Habit, completedEpochDays: Set<Long>): MasteryInfo {
+        val today = LocalDate.now()
+        val windowStart = today.minusDays((MASTERY_WINDOW_DAYS - 1).toLong())
+        val createdDate = if (habit.createdAtEpochDay > 0) LocalDate.ofEpochDay(habit.createdAtEpochDay) else windowStart
+        val since = if (createdDate.isAfter(windowStart)) createdDate else windowStart
+
+        var scheduled = 0
+        var done = 0
+        var day = since
+        while (!day.isAfter(today)) {
+            if (isActiveOn(habit, day)) {
+                scheduled++
+                if (completedEpochDays.contains(day.toEpochDay())) done++
+            }
+            day = day.plusDays(1)
+        }
+        val progress = if (scheduled == 0) 0 else (done * 100 / scheduled)
+        val mastered = progress >= MASTERY_THRESHOLD_PERCENT && scheduled >= MASTERY_MIN_SCHEDULED_DAYS
+        return MasteryInfo(progressPercent = progress, scheduledDays = scheduled, isMastered = mastered)
     }
 
     private fun isActiveOn(habit: Habit, date: LocalDate): Boolean {
@@ -153,8 +201,21 @@ class HabitRepository(
     }
 }
 
+private const val MASTERY_WINDOW_DAYS = 90
+private const val MASTERY_THRESHOLD_PERCENT = 80
+private const val MASTERY_MIN_SCHEDULED_DAYS = 14
+
 data class HabitStats(
     val currentStreak: Int,
     val bestStreak: Int,
-    val completionRatePercent: Int
+    val completionRatePercent: Int,
+    val masteryProgressPercent: Int,
+    val masteryScheduledDays: Int,
+    val isMastered: Boolean
+)
+
+data class MasteryInfo(
+    val progressPercent: Int,
+    val scheduledDays: Int,
+    val isMastered: Boolean
 )

@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -15,6 +17,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -26,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
@@ -46,7 +50,7 @@ fun HabitDetailScreen(
     onEdit: () -> Unit
 ) {
     var habit by remember { mutableStateOf<Habit?>(null) }
-    var stats by remember { mutableStateOf(HabitStats(0, 0, 0)) }
+    var stats by remember { mutableStateOf(HabitStats(0, 0, 0, 0, 0, false)) }
     var completedDates by remember { mutableStateOf(setOf<LocalDate>()) }
     var barValues by remember { mutableStateOf(List(30) { 0 }) }
     var barDaySpan by remember { mutableStateOf(30) }
@@ -125,6 +129,8 @@ fun HabitDetailScreen(
                 )
             }
 
+            MasteryProgressSection(stats)
+
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.detail_heatmap_title), style = MaterialTheme.typography.titleMedium)
                 HabitHeatmap(completedDates = completedDates)
@@ -170,6 +176,53 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
         }
+    }
+}
+
+/**
+ * Progress toward "mastery" (habit-formation automaticity, per Lally et al. 2010:
+ * what predicts automaticity is the overall completion RATE over a long window,
+ * not an unbroken streak - see [HabitStats.masteryProgressPercent]). Below the
+ * 80%-over-90-days threshold this reads as a plain progress bar toward the goal;
+ * once mastered it flips to a settled "освоено" state instead of a bar that
+ * would otherwise look permanently maxed-out.
+ */
+@Composable
+private fun MasteryProgressSection(stats: HabitStats) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(stringResource(R.string.detail_mastery_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                if (stats.isMastered) {
+                    stringResource(R.string.detail_mastery_done)
+                } else {
+                    stringResource(R.string.detail_mastery_percent, stats.masteryProgressPercent)
+                },
+                style = MaterialTheme.typography.titleMedium,
+                color = if (stats.isMastered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            )
+        }
+        LinearProgressIndicator(
+            progress = { (stats.masteryProgressPercent / 100f).coerceIn(0f, 1f) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp)),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+        Text(
+            if (stats.masteryScheduledDays < 14) {
+                stringResource(R.string.detail_mastery_hint_not_enough_data)
+            } else {
+                stringResource(R.string.detail_mastery_hint, stats.masteryScheduledDays)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        )
     }
 }
 
