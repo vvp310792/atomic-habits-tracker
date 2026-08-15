@@ -312,7 +312,7 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
  * shrinks during exhale - and the phase name is shown so the rhythm is legible,
  * not just a shrinking/growing shape.
  */
-private const val PHASE_SECONDS = 4
+private const val PHASE_SECONDS = 3
 private const val MIN_SCALE = 0.55f
 private const val MAX_SCALE = 1f
 

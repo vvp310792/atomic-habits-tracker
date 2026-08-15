@@ -35,8 +35,8 @@
     <string name="impulse_link_hint">К какой привычке это относится? (необязательно)</string>
     <string name="impulse_link_hint_required">Выберите тег — хотя бы «Без привязки», чтобы продолжить</string>
     <string name="impulse_no_link">Без привязки</string>
-    <string name="impulse_breathing_hint">Квадратное дыхание: вдох — задержка — выдох — задержка, по 4 секунды каждая</string>
-    <string name="impulse_wait_hint">Квадратное дыхание: вдох — задержка — выдох — задержка, по 4 секунды каждая. Галочка станет доступна через 2 минуты</string>
+    <string name="impulse_breathing_hint">Квадратное дыхание: вдох — задержка — выдох — задержка, по 3 секунды каждая</string>
+    <string name="impulse_wait_hint">Квадратное дыхание: вдох — задержка — выдох — задержка, по 3 секунды каждая. Галочка станет доступна через 2 минуты</string>
     <string name="impulse_check">Удержался</string>
     <string name="impulse_cross">Поддался</string>
     <string name="impulse_logged">Записано!</string>
