@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChecklistRtl
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -51,6 +52,7 @@ import com.atomichabits.tracker.BuildConfig
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.Identity
+import com.atomichabits.tracker.export.DataExporter
 import com.atomichabits.tracker.update.ApkInstaller
 import com.atomichabits.tracker.update.UpdateCheckResult
 import com.atomichabits.tracker.update.UpdateChecker
@@ -70,6 +72,8 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null, onOpenSco
     var showAddIdentity by remember { mutableStateOf(false) }
     var editingIdentity by remember { mutableStateOf<Identity?>(null) }
     var editIdentityText by remember { mutableStateOf("") }
+    var exporting by remember { mutableStateOf(false) }
+    var exportError by remember { mutableStateOf<String?>(null) }
 
     var currentUserEmail by remember { mutableStateOf(app.authManager.currentUser?.email) }
     var authBusy by remember { mutableStateOf(false) }
@@ -298,6 +302,51 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null, onOpenSco
                         else "\u26A0\uFE0F " + stringResource(R.string.settings_notifications_permission),
                         modifier = Modifier.padding(16.dp)
                     )
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(stringResource(R.string.settings_export_section), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.settings_export_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                OutlinedButton(
+                    onClick = {
+                        exporting = true
+                        exportError = null
+                        scope.launch {
+                            try {
+                                val file = withContext(Dispatchers.IO) {
+                                    DataExporter.export(
+                                        context = context,
+                                        habitDao = app.database.habitDao(),
+                                        habitLogDao = app.database.habitLogDao(),
+                                        identityDao = app.database.identityDao(),
+                                        impulseLogDao = app.database.impulseLogDao()
+                                    )
+                                }
+                                context.startActivity(DataExporter.shareIntent(context, file))
+                            } catch (e: Exception) {
+                                exportError = e.message ?: context.getString(R.string.settings_export_error)
+                            } finally {
+                                exporting = false
+                            }
+                        }
+                    },
+                    enabled = !exporting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(8.dp))
+                    Text(
+                        if (exporting) stringResource(R.string.settings_export_in_progress)
+                        else stringResource(R.string.settings_export_button)
+                    )
+                }
+                exportError?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                 }
             }
 

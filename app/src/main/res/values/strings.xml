@@ -149,6 +149,11 @@
     <string name="settings_notifications_permission">Разрешить уведомления</string>
 
     <!-- Updates -->
+    <string name="settings_export_section">Экспорт данных</string>
+    <string name="settings_export_hint">Выгрузить все привычки, историю выполнения и идентичности в JSON-файл — например, чтобы отправить его в чат с ИИ и получить рекомендации по организации привычек</string>
+    <string name="settings_export_button">Экспортировать и поделиться</string>
+    <string name="settings_export_in_progress">Готовим файл…</string>
+    <string name="settings_export_error">Не удалось создать файл экспорта</string>
     <string name="settings_updates_section">Обновления</string>
     <string name="settings_updates_current">Установлена версия %1$s (build %2$d)</string>
     <string name="settings_updates_check">Проверить обновления</string>

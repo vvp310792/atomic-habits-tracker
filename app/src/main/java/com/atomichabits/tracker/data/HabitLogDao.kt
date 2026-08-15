@@ -33,6 +33,9 @@ interface HabitLogDao {
     @Query("SELECT * FROM habit_logs")
     fun observeAllLogs(): Flow<List<HabitLog>>
 
+    @Query("SELECT * FROM habit_logs")
+    suspend fun getAllOnce(): List<HabitLog>
+
     @Query("SELECT * FROM habit_logs WHERE synced = 0 ORDER BY dateEpochDay ASC")
     suspend fun getUnsyncedLogs(): List<HabitLog>
 
