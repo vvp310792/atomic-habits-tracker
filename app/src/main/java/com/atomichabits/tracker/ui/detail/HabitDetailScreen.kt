@@ -35,6 +35,7 @@ import com.atomichabits.tracker.data.HabitStats
 import com.atomichabits.tracker.ui.components.CompletionBarChart
 import com.atomichabits.tracker.ui.components.HabitHeatmap
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,7 +48,8 @@ fun HabitDetailScreen(
     var habit by remember { mutableStateOf<Habit?>(null) }
     var stats by remember { mutableStateOf(HabitStats(0, 0, 0)) }
     var completedDates by remember { mutableStateOf(setOf<LocalDate>()) }
-    var last30 by remember { mutableStateOf(List(30) { 0 }) }
+    var barValues by remember { mutableStateOf(List(30) { 0 }) }
+    var barDaySpan by remember { mutableStateOf(30) }
 
     LaunchedEffect(habitId) {
         val h = app.database.habitDao().getHabit(habitId) ?: return@LaunchedEffect
@@ -58,8 +60,20 @@ fun HabitDetailScreen(
         val doneDates = logs.filter { it.completed }.map { LocalDate.ofEpochDay(it.dateEpochDay) }.toSet()
         completedDates = doneDates
 
-        val since = LocalDate.now().minusDays(29)
-        last30 = (0..29).map { offset ->
+        val today = LocalDate.now()
+        val windowStart = today.minusDays(29)
+        // For a habit younger than 30 days, starting the window at a fixed
+        // "today - 29" pads the chart with days from before the habit even
+        // existed - real data ends up compressed into just the last few slots
+        // instead of spanning the chart. Clamp the start to the habit's own
+        // creation date when that's more recent, so the chart always reads as
+        // "the whole life of this habit so far", growing wider over time
+        // instead of looking stuck at the right edge.
+        val createdDate = if (h.createdAtEpochDay > 0) LocalDate.ofEpochDay(h.createdAtEpochDay) else windowStart
+        val since = if (createdDate.isAfter(windowStart)) createdDate else windowStart
+        val span = (ChronoUnit.DAYS.between(since, today).toInt() + 1).coerceIn(1, 30)
+        barDaySpan = span
+        barValues = (0 until span).map { offset ->
             if (doneDates.contains(since.plusDays(offset.toLong()))) 1 else 0
         }
     }
@@ -117,8 +131,11 @@ fun HabitDetailScreen(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.detail_chart_title), style = MaterialTheme.typography.titleMedium)
-                CompletionBarChart(values = last30)
+                Text(
+                    pluralDaysTitle(barDaySpan),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                CompletionBarChart(values = barValues)
             }
 
             if (h.lawObvious.isNotBlank() || h.lawAttractive.isNotBlank() ||
@@ -163,4 +180,21 @@ private fun LawSummaryRow(title: String, value: String) {
         Text(title, style = MaterialTheme.typography.labelLarge)
         Text(value, style = MaterialTheme.typography.bodyMedium)
     }
+}
+
+/**
+ * "Последние 30 дней" once the habit has enough history to fill that window,
+ * otherwise a correctly-declined "Последние N дней/дня/день" matching however
+ * long the habit has actually existed - see [HabitDetailScreen]'s [barDaySpan].
+ */
+@Composable
+private fun pluralDaysTitle(span: Int): String {
+    if (span >= 30) return stringResource(R.string.detail_chart_title)
+    val word = when {
+        span % 100 in 11..14 -> "дней"
+        span % 10 == 1 -> "день"
+        span % 10 in 2..4 -> "дня"
+        else -> "дней"
+    }
+    return "Последние $span $word"
 }
