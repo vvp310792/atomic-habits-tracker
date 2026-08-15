@@ -169,6 +169,15 @@ class HabitRepository(
      * enough opportunity to judge it ([MASTERY_MIN_SCHEDULED_DAYS] scheduled days
      * minimum, so a habit can't be declared "mastered" after 3 lucky days).
      *
+     * [MasteryInfo.progressPercent] is progress toward THAT combined goal, not
+     * just the raw completion rate so far - a brand-new habit with 5 perfect days
+     * should read as "off to a good start" (a few percent), not "100%, done!"
+     * just because every day it's had a chance to run, it succeeded. It's the
+     * smaller of two ratios: how close the actual rate is to the 80% target, and
+     * how much of the required evidence (14 scheduled days) has been collected.
+     * Once both reach 100%, the badge flips to mastered at the same moment the
+     * bar reads 100% - the two never contradict each other.
+     *
      * This is a plain (non-suspend) function, callable both from [computeStats]
      * (which already has the log history) and directly from a UI layer that has
      * already loaded all logs itself (e.g. for showing progress across a whole
@@ -190,9 +199,14 @@ class HabitRepository(
             }
             day = day.plusDays(1)
         }
-        val progress = if (scheduled == 0) 0 else (done * 100 / scheduled)
-        val mastered = progress >= MASTERY_THRESHOLD_PERCENT && scheduled >= MASTERY_MIN_SCHEDULED_DAYS
-        return MasteryInfo(progressPercent = progress, scheduledDays = scheduled, isMastered = mastered)
+        val actualRatePercent = if (scheduled == 0) 0 else (done * 100 / scheduled)
+        val mastered = actualRatePercent >= MASTERY_THRESHOLD_PERCENT && scheduled >= MASTERY_MIN_SCHEDULED_DAYS
+
+        val rateProgress = (actualRatePercent.toFloat() / MASTERY_THRESHOLD_PERCENT).coerceIn(0f, 1f)
+        val dataProgress = (scheduled.toFloat() / MASTERY_MIN_SCHEDULED_DAYS).coerceIn(0f, 1f)
+        val combinedProgress = (minOf(rateProgress, dataProgress) * 100).toInt()
+
+        return MasteryInfo(progressPercent = combinedProgress, scheduledDays = scheduled, isMastered = mastered)
     }
 
     private fun isActiveOn(habit: Habit, date: LocalDate): Boolean {

@@ -65,17 +65,16 @@ fun HabitDetailScreen(
         completedDates = doneDates
 
         val today = LocalDate.now()
-        val windowStart = today.minusDays(29)
-        // For a habit younger than 30 days, starting the window at a fixed
-        // "today - 29" pads the chart with days from before the habit even
-        // existed - real data ends up compressed into just the last few slots
-        // instead of spanning the chart. Clamp the start to the habit's own
-        // creation date when that's more recent, so the chart always reads as
-        // "the whole life of this habit so far", growing wider over time
-        // instead of looking stuck at the right edge.
-        val createdDate = if (h.createdAtEpochDay > 0) LocalDate.ofEpochDay(h.createdAtEpochDay) else windowStart
-        val since = if (createdDate.isAfter(windowStart)) createdDate else windowStart
-        val span = (ChronoUnit.DAYS.between(since, today).toInt() + 1).coerceIn(1, 30)
+        // The bar chart's window: grows with the habit's actual age (so a
+        // 5-day-old habit doesn't get padded with 25 days of "before it
+        // existed" empty bars crammed at the right edge), but never shrinks
+        // below a full week - a 2-3 day window reads as broken/empty rather
+        // than as "a young habit doing well", and a week is the smallest span
+        // that's actually legible as a trend. Capped at 30 for older habits.
+        val createdDate = if (h.createdAtEpochDay > 0) LocalDate.ofEpochDay(h.createdAtEpochDay) else today.minusDays(29)
+        val naturalSpan = (ChronoUnit.DAYS.between(createdDate, today).toInt() + 1)
+        val span = naturalSpan.coerceIn(7, 30)
+        val since = today.minusDays((span - 1).toLong())
         barDaySpan = span
         barValues = (0 until span).map { offset ->
             if (doneDates.contains(since.plusDays(offset.toLong()))) 1 else 0
