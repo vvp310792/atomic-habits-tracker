@@ -3,6 +3,7 @@ package com.atomichabits.tracker.data
 import com.atomichabits.tracker.sync.FirestoreSyncManager
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
+import kotlin.math.roundToInt
 
 class HabitRepository(
     private val habitDao: HabitDao,
@@ -169,14 +170,16 @@ class HabitRepository(
      * enough opportunity to judge it ([MASTERY_MIN_SCHEDULED_DAYS] scheduled days
      * minimum, so a habit can't be declared "mastered" after 3 lucky days).
      *
-     * [MasteryInfo.progressPercent] is progress toward THAT combined goal, not
-     * just the raw completion rate so far - a brand-new habit with 5 perfect days
-     * should read as "off to a good start" (a few percent), not "100%, done!"
-     * just because every day it's had a chance to run, it succeeded. It's the
-     * smaller of two ratios: how close the actual rate is to the 80% target, and
-     * how much of the required evidence (14 scheduled days) has been collected.
-     * Once both reach 100%, the badge flips to mastered at the same moment the
-     * bar reads 100% - the two never contradict each other.
+     * [MasteryInfo.progressPercent] is literally "how many of the completions
+     * you'd need for mastery have you banked so far": the target is 80% of a
+     * full 90-day window's worth of scheduled days (e.g. 72 for a daily habit),
+     * and progress is completions-so-far divided by that target. 5 successful
+     * days out of a 72-day target is ~7%, not some inflated fraction relative to
+     * the much smaller 14-day minimum-evidence gate - that gate only decides
+     * *whether* mastery can be judged yet, it isn't the yardstick for progress.
+     * Once the habit is actually mastered the bar reads a flat 100%, regardless
+     * of how much of the nominal 90-day window has elapsed (a simple habit can
+     * legitimately master in 18 days per Lally, well short of 90).
      *
      * This is a plain (non-suspend) function, callable both from [computeStats]
      * (which already has the log history) and directly from a UI layer that has
@@ -186,9 +189,22 @@ class HabitRepository(
     fun computeMastery(habit: Habit, completedEpochDays: Set<Long>): MasteryInfo {
         val today = LocalDate.now()
         val windowStart = today.minusDays((MASTERY_WINDOW_DAYS - 1).toLong())
+
+        // The long-run target: 80% of however many days this habit's own
+        // active-days pattern would schedule across a FULL 90-day window,
+        // regardless of how young the habit actually is.
+        var nominalScheduled = 0
+        var probe = windowStart
+        while (!probe.isAfter(today)) {
+            if (isActiveOn(habit, probe)) nominalScheduled++
+            probe = probe.plusDays(1)
+        }
+        val target = (nominalScheduled * MASTERY_THRESHOLD_PERCENT / 100).coerceAtLeast(1)
+
+        // Actual performance so far (from creation date if the habit is younger
+        // than the window).
         val createdDate = if (habit.createdAtEpochDay > 0) LocalDate.ofEpochDay(habit.createdAtEpochDay) else windowStart
         val since = if (createdDate.isAfter(windowStart)) createdDate else windowStart
-
         var scheduled = 0
         var done = 0
         var day = since
@@ -202,11 +218,9 @@ class HabitRepository(
         val actualRatePercent = if (scheduled == 0) 0 else (done * 100 / scheduled)
         val mastered = actualRatePercent >= MASTERY_THRESHOLD_PERCENT && scheduled >= MASTERY_MIN_SCHEDULED_DAYS
 
-        val rateProgress = (actualRatePercent.toFloat() / MASTERY_THRESHOLD_PERCENT).coerceIn(0f, 1f)
-        val dataProgress = (scheduled.toFloat() / MASTERY_MIN_SCHEDULED_DAYS).coerceIn(0f, 1f)
-        val combinedProgress = (minOf(rateProgress, dataProgress) * 100).toInt()
+        val progress = if (mastered) 100 else ((done * 100f / target).roundToInt()).coerceIn(0, 99)
 
-        return MasteryInfo(progressPercent = combinedProgress, scheduledDays = scheduled, isMastered = mastered)
+        return MasteryInfo(progressPercent = progress, scheduledDays = scheduled, isMastered = mastered)
     }
 
     private fun isActiveOn(habit: Habit, date: LocalDate): Boolean {
