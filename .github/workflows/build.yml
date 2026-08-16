@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      build_release:
+        description: 'Also build & upload the signed release APK (for RuStore)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -38,13 +43,15 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
-      # Signed release build for store distribution (RuStore). Entirely optional -
-      # if RELEASE_KEYSTORE_BASE64 isn't set as a repo secret, these steps just
-      # skip and the debug build above is unaffected. See docs/SETUP_RUSTORE.md.
-      - name: Check whether release signing is configured
+      # Signed release build for store distribution (RuStore). Only runs when
+      # explicitly requested via a manual workflow_dispatch with build_release=true
+      # (see the "Собрать релизную сборку" trigger) - a normal push to main just
+      # builds the debug APK above. Also requires RELEASE_KEYSTORE_BASE64 to be
+      # set as a repo secret. See docs/SETUP_RUSTORE.md.
+      - name: Check whether to build the signed release APK
         id: release_check
         run: |
-          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
+          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ] && [ "${{ github.event.inputs.build_release }}" = "true" ]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
