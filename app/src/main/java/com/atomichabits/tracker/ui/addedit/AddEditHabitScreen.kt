@@ -99,6 +99,12 @@ fun AddEditHabitScreen(
     var identityId by remember { mutableStateOf("") }
     var identityLabel by remember { mutableStateOf("") }
     var showIdentityPicker by remember { mutableStateOf(false) }
+    var temptationBundle by remember { mutableStateOf("") }
+    // Not directly user-editable here - only the Goldilocks "Усложнить" flow on
+    // the habit detail screen sets this, and it must be preserved (not reset to
+    // 0) whenever this screen saves the habit for any other reason.
+    var difficultyNote by remember { mutableStateOf("") }
+    var difficultyBumpedAtEpochDay by remember { mutableStateOf(0L) }
 
     val allHabits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
     val allIdentities by app.identityRepository.observeActive().collectAsState(initial = emptyList())
@@ -144,6 +150,9 @@ fun AddEditHabitScreen(
                 stackAnchorLabel = h.stackAnchorLabel
                 identityId = h.identityId
                 identityLabel = h.identityLabel
+                temptationBundle = h.temptationBundle
+                difficultyNote = h.difficultyNote
+                difficultyBumpedAtEpochDay = h.difficultyBumpedAtEpochDay
             }
             initialLoadDone = true
         }
@@ -174,7 +183,10 @@ fun AddEditHabitScreen(
         stackAnchorType = stackAnchorType,
         stackAnchorLabel = stackAnchorLabel,
         identityId = identityId,
-        identityLabel = identityLabel
+        identityLabel = identityLabel,
+        temptationBundle = temptationBundle,
+        difficultyNote = difficultyNote,
+        difficultyBumpedAtEpochDay = difficultyBumpedAtEpochDay
     )
 
     // Autosave while editing an existing habit (not while creating a new one -
@@ -356,6 +368,12 @@ fun AddEditHabitScreen(
                 hint = stringResource(R.string.law_attractive_hint),
                 value = lawAttractive,
                 onValueChange = { lawAttractive = it }
+            )
+            LawSection(
+                title = stringResource(R.string.temptation_bundle_title),
+                hint = stringResource(R.string.temptation_bundle_hint),
+                value = temptationBundle,
+                onValueChange = { temptationBundle = it }
             )
             LawSection(
                 title = stringResource(R.string.law_easy_title),

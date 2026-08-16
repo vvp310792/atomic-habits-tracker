@@ -169,6 +169,8 @@ class HabitRepository(
      * or its whole lifetime if younger than that window - provided there's been
      * enough opportunity to judge it ([MASTERY_MIN_SCHEDULED_DAYS] scheduled days
      * minimum, so a habit can't be declared "mastered" after 3 lucky days).
+     * A Goldilocks difficulty bump ([Habit.difficultyBumpedAtEpochDay]) restarts
+     * this the same way a fresh [Habit.createdAtEpochDay] would.
      *
      * [MasteryInfo.progressPercent] is literally "how many of the completions
      * you'd need for mastery have you banked so far": the target is 80% of a
@@ -201,9 +203,12 @@ class HabitRepository(
         }
         val target = (nominalScheduled * MASTERY_THRESHOLD_PERCENT / 100).coerceAtLeast(1)
 
-        // Actual performance so far (from creation date if the habit is younger
-        // than the window).
-        val createdDate = if (habit.createdAtEpochDay > 0) LocalDate.ofEpochDay(habit.createdAtEpochDay) else windowStart
+        // Actual performance so far (from creation date, or from the last
+        // Goldilocks difficulty bump if that's more recent - a harder version
+        // of the habit honestly hasn't earned its automaticity yet, even though
+        // the row and its pre-bump history are the same habit).
+        val effectiveStart = maxOf(habit.createdAtEpochDay, habit.difficultyBumpedAtEpochDay)
+        val createdDate = if (effectiveStart > 0) LocalDate.ofEpochDay(effectiveStart) else windowStart
         val since = if (createdDate.isAfter(windowStart)) createdDate else windowStart
         var scheduled = 0
         var done = 0

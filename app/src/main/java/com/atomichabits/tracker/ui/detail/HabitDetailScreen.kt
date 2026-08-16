@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,8 +20,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -107,6 +111,20 @@ fun HabitDetailScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            if (h.temptationBundle.isNotBlank()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                ) {
+                    Text(
+                        "\uD83D\uDD12 " + h.temptationBundle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -129,6 +147,26 @@ fun HabitDetailScreen(
             }
 
             MasteryProgressSection(stats)
+
+            if (stats.isMastered) {
+                GoldilocksSection(
+                    difficultyNote = h.difficultyNote,
+                    onBump = { newNote ->
+                        app.launchPersistent {
+                            val updated = h.copy(
+                                difficultyNote = newNote,
+                                difficultyBumpedAtEpochDay = LocalDate.now().toEpochDay()
+                            )
+                            app.repository.saveHabit(updated)
+                            val fresh = app.database.habitDao().getHabit(updated.id)
+                            if (fresh != null) {
+                                habit = fresh
+                                stats = app.repository.computeStats(fresh)
+                            }
+                        }
+                    }
+                )
+            }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.detail_heatmap_title), style = MaterialTheme.typography.titleMedium)
@@ -221,6 +259,86 @@ private fun MasteryProgressSection(stats: HabitStats) {
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        )
+    }
+}
+
+/**
+ * The Goldilocks Rule (motivation peaks when a task is a bit past your current
+ * skill level, neither trivial nor overwhelming): shown once a habit is
+ * actually mastered (see [HabitStats.isMastered]) as a nudge to describe and
+ * bump its difficulty, rather than letting an easy habit stay easy forever.
+ * Bumping restarts the mastery clock for the new, harder version - see
+ * [Habit.difficultyBumpedAtEpochDay].
+ */
+@Composable
+private fun GoldilocksSection(difficultyNote: String, onBump: (String) -> Unit) {
+    var showDialog by remember { mutableStateOf(false) }
+    var input by remember(difficultyNote) { mutableStateOf(difficultyNote) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                stringResource(R.string.goldilocks_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Text(
+                stringResource(R.string.goldilocks_mastered_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f)
+            )
+            Text(
+                if (difficultyNote.isNotBlank()) {
+                    stringResource(R.string.goldilocks_current_level, difficultyNote)
+                } else {
+                    stringResource(R.string.goldilocks_no_level)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            OutlinedButton(onClick = { showDialog = true }) {
+                Text(stringResource(R.string.goldilocks_bump_button))
+            }
+        }
+    }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onBump(input.trim())
+                        showDialog = false
+                    },
+                    enabled = input.isNotBlank()
+                ) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) { Text(stringResource(R.string.cancel)) }
+            },
+            title = { Text(stringResource(R.string.goldilocks_dialog_title)) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = input,
+                        onValueChange = { input = it },
+                        placeholder = { Text(stringResource(R.string.goldilocks_dialog_hint)) },
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        stringResource(R.string.goldilocks_bumped_hint, java.time.LocalDate.now().toString()),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
         )
     }
 }

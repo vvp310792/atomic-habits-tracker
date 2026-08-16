@@ -103,6 +103,9 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
             "stackAnchorLabel" to habit.stackAnchorLabel,
             "identityId" to habit.identityId,
             "identityLabel" to habit.identityLabel,
+            "difficultyNote" to habit.difficultyNote,
+            "difficultyBumpedAtEpochDay" to habit.difficultyBumpedAtEpochDay,
+            "temptationBundle" to habit.temptationBundle,
             "updatedAt" to FieldValue.serverTimestamp()
         )
         habitsRef(uid).document(habit.syncId).set(data, SetOptions.merge())
@@ -203,7 +206,10 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
                 stackAnchorType = doc.getString("stackAnchorType") ?: "",
                 stackAnchorLabel = doc.getString("stackAnchorLabel") ?: "",
                 identityId = doc.getString("identityId") ?: "",
-                identityLabel = doc.getString("identityLabel") ?: ""
+                identityLabel = doc.getString("identityLabel") ?: "",
+                difficultyNote = doc.getString("difficultyNote") ?: "",
+                difficultyBumpedAtEpochDay = doc.getLong("difficultyBumpedAtEpochDay") ?: 0L,
+                temptationBundle = doc.getString("temptationBundle") ?: ""
             )
             val newLocalId = habitDao.upsert(habit)
             val localId = existing?.id ?: newLocalId

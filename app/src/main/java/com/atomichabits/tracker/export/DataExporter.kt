@@ -88,6 +88,13 @@ object DataExporter {
                         }
                         if (habit.stackAnchorLabel.isNotBlank()) put("stackedAfter", habit.stackAnchorLabel)
                         if (habit.identityLabel.isNotBlank()) put("linkedIdentity", habit.identityLabel)
+                        if (habit.temptationBundle.isNotBlank()) put("temptationBundle", habit.temptationBundle)
+                        if (habit.difficultyNote.isNotBlank()) {
+                            put("difficultyLevel", habit.difficultyNote)
+                            if (habit.difficultyBumpedAtEpochDay > 0) {
+                                put("difficultyLastBumped", LocalDate.ofEpochDay(habit.difficultyBumpedAtEpochDay).toString())
+                            }
+                        }
                         put("archived", habit.archived)
                         put("totalCompletions", dates.size)
                         put("completionDates", JSONArray(dates))

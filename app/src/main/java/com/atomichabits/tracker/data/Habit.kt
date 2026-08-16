@@ -44,6 +44,24 @@ import androidx.room.PrimaryKey
  * for that identity. [identityLabel] caches the statement text for display,
  * same pattern as [stackAnchorLabel].
  *
+ * The Goldilocks Rule (motivation peaks when a task is neither too easy nor
+ * too hard - roughly 4% past your current skill level): [difficultyNote] is a
+ * free-text description of what this habit currently *is* in concrete terms
+ * (e.g. "20 минут бега", "3 подхода по 15"), so there's something specific to
+ * look at and bump once the habit's been mastered a while.
+ * [difficultyBumpedAtEpochDay] is set whenever that note is deliberately
+ * changed - bumping difficulty starts a fresh mastery clock for HabitRepository's
+ * computeMastery, since a harder version is honestly a different habit whose
+ * automaticity hasn't been earned yet, even though the streak/history before
+ * the bump still legitimately belongs to this same row.
+ *
+ * Temptation bundling (Katy Milkman: pair a habit with an indulgence that's
+ * ONLY allowed *during* it, e.g. "only this podcast while running" - distinct
+ * from habit stacking, which is about sequence/order, not a simultaneous
+ * reward-lock): [temptationBundle] is a free-text description of the
+ * indulgence bundled onto this habit, shown with its own lock badge in the UI
+ * rather than folded into [lawAttractive] prose.
+ *
  * Every habit is one universal entity, classified by two independent flags:
  * [qualityType] ("USEFUL" | "HARMFUL" | "NEUTRAL" | "DESIRED") is the honest,
  * judgment-free tag from the Habit Scorecard exercise - what kind of thing this
@@ -82,5 +100,8 @@ data class Habit(
     val stackAnchorType: String = "",
     val stackAnchorLabel: String = "",
     val identityId: String = "",
-    val identityLabel: String = ""
+    val identityLabel: String = "",
+    val difficultyNote: String = "",
+    val difficultyBumpedAtEpochDay: Long = 0,
+    val temptationBundle: String = ""
 )

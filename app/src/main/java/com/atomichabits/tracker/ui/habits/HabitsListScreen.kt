@@ -336,6 +336,14 @@ private fun UniversalHabitRow(habit: Habit, impulseScore: Pair<Int, Int>?, maste
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
+                if (habit.temptationBundle.isNotBlank()) {
+                    Text(
+                        "\uD83D\uDD12 " + habit.temptationBundle,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
                 if (habit.alternativeSuggestion.isNotBlank()) {
                     Text(
                         "\uD83D\uDCA1 " + habit.alternativeSuggestion,
