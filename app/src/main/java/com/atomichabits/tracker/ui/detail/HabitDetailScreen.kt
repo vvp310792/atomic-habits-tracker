@@ -146,7 +146,7 @@ fun HabitDetailScreen(
                 )
             }
 
-            MasteryProgressSection(stats)
+            MasteryProgressSection(stats, h.manuallyMastered)
 
             if (stats.isMastered) {
                 GoldilocksSection(
@@ -225,7 +225,7 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
  * would otherwise look permanently maxed-out.
  */
 @Composable
-private fun MasteryProgressSection(stats: HabitStats) {
+private fun MasteryProgressSection(stats: HabitStats, manuallyMastered: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -252,10 +252,10 @@ private fun MasteryProgressSection(stats: HabitStats) {
             trackColor = MaterialTheme.colorScheme.surfaceVariant
         )
         Text(
-            if (stats.masteryScheduledDays < 14) {
-                stringResource(R.string.detail_mastery_hint_not_enough_data)
-            } else {
-                stringResource(R.string.detail_mastery_hint, stats.masteryScheduledDays)
+            when {
+                manuallyMastered -> stringResource(R.string.detail_mastery_hint_manual)
+                stats.masteryScheduledDays < 14 -> stringResource(R.string.detail_mastery_hint_not_enough_data)
+                else -> stringResource(R.string.detail_mastery_hint, stats.masteryScheduledDays)
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)

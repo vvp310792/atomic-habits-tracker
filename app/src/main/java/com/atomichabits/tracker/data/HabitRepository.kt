@@ -147,14 +147,18 @@ class HabitRepository(
         val rate = if (scheduled == 0) 0 else (done * 100 / scheduled)
 
         val mastery = computeMastery(habit, completedDays)
+        // A habit can also be mastered by self-declaration (Habit.manuallyMastered),
+        // independent of tracked history - see the class doc on that field.
+        val isMastered = mastery.isMastered || habit.manuallyMastered
+        val masteryProgress = if (habit.manuallyMastered) 100 else mastery.progressPercent
 
         return HabitStats(
             currentStreak = current,
             bestStreak = best,
             completionRatePercent = rate,
-            masteryProgressPercent = mastery.progressPercent,
+            masteryProgressPercent = masteryProgress,
             masteryScheduledDays = mastery.scheduledDays,
-            isMastered = mastery.isMastered
+            isMastered = isMastered
         )
     }
 
@@ -165,23 +169,31 @@ class HabitRepository(
      * completion RATE over a long window is what predicts automaticity - not an
      * unbroken streak). A habit counts as mastered once it's hit at least
      * [MASTERY_THRESHOLD_PERCENT]% of its own scheduled days (only days it was
-     * actually due, per [isActiveOn]) over the last [MASTERY_WINDOW_DAYS] days -
-     * or its whole lifetime if younger than that window - provided there's been
-     * enough opportunity to judge it ([MASTERY_MIN_SCHEDULED_DAYS] scheduled days
-     * minimum, so a habit can't be declared "mastered" after 3 lucky days).
-     * A Goldilocks difficulty bump ([Habit.difficultyBumpedAtEpochDay]) restarts
-     * this the same way a fresh [Habit.createdAtEpochDay] would.
+     * actually due, per [isActiveOn]) over its last [MASTERY_WINDOW_DAYS]
+     * *scheduled* days - not 90 calendar days. A habit that only runs, say,
+     * Monday-Friday needs its window stretched further back in real time to
+     * gather 90 actual occasions to perform it; comparing it against a flat
+     * 90-CALENDAR-day span would silently give it an easier target (fewer
+     * required repetitions) than a daily habit gets over the same stretch,
+     * which isn't a fair reading of "90 days of practice". Provided there's been
+     * enough opportunity to judge it at all ([MASTERY_MIN_SCHEDULED_DAYS]
+     * scheduled days minimum, so a habit can't be declared "mastered" after 3
+     * lucky days). A Goldilocks difficulty bump ([Habit.difficultyBumpedAtEpochDay])
+     * restarts this the same way a fresh [Habit.createdAtEpochDay] would.
      *
      * [MasteryInfo.progressPercent] is literally "how many of the completions
      * you'd need for mastery have you banked so far": the target is 80% of a
-     * full 90-day window's worth of scheduled days (e.g. 72 for a daily habit),
-     * and progress is completions-so-far divided by that target. 5 successful
-     * days out of a 72-day target is ~7%, not some inflated fraction relative to
-     * the much smaller 14-day minimum-evidence gate - that gate only decides
-     * *whether* mastery can be judged yet, it isn't the yardstick for progress.
-     * Once the habit is actually mastered the bar reads a flat 100%, regardless
-     * of how much of the nominal 90-day window has elapsed (a simple habit can
-     * legitimately master in 18 days per Lally, well short of 90).
+     * full 90-*scheduled*-day window (e.g. 72 for a daily habit, also 72 for a
+     * Mon-Fri habit - just spread across ~126 calendar days instead of 90), and
+     * progress is completions-so-far divided by that target. Once the habit is
+     * actually mastered the bar reads a flat 100%, regardless of how much of
+     * the nominal window has elapsed (a simple habit can legitimately master in
+     * 18 days per Lally, well short of 90).
+     *
+     * This only reflects the *computed* path to mastery - a habit can also be
+     * mastered by self-declaration (see [Habit.manuallyMastered]), which callers
+     * combine with this result themselves (see [computeStats]) since it isn't
+     * a function of log history at all.
      *
      * This is a plain (non-suspend) function, callable both from [computeStats]
      * (which already has the log history) and directly from a UI layer that has
@@ -190,16 +202,17 @@ class HabitRepository(
      */
     fun computeMastery(habit: Habit, completedEpochDays: Set<Long>): MasteryInfo {
         val today = LocalDate.now()
-        val windowStart = today.minusDays((MASTERY_WINDOW_DAYS - 1).toLong())
 
-        // The long-run target: 80% of however many days this habit's own
-        // active-days pattern would schedule across a FULL 90-day window,
-        // regardless of how young the habit actually is.
+        // Walk backward from today collecting only *scheduled* days until we
+        // have MASTERY_WINDOW_DAYS of them (or hit the sanity cap, for a habit
+        // scheduled so rarely this would otherwise search back for years).
+        var windowStart = today
         var nominalScheduled = 0
-        var probe = windowStart
-        while (!probe.isAfter(today)) {
-            if (isActiveOn(habit, probe)) nominalScheduled++
-            probe = probe.plusDays(1)
+        var calendarStep = 0
+        while (nominalScheduled < MASTERY_WINDOW_DAYS && calendarStep < MASTERY_MAX_CALENDAR_LOOKBACK_DAYS) {
+            if (isActiveOn(habit, windowStart)) nominalScheduled++
+            if (nominalScheduled < MASTERY_WINDOW_DAYS) windowStart = windowStart.minusDays(1)
+            calendarStep++
         }
         val target = (nominalScheduled * MASTERY_THRESHOLD_PERCENT / 100).coerceAtLeast(1)
 
@@ -237,6 +250,11 @@ class HabitRepository(
 private const val MASTERY_WINDOW_DAYS = 90
 private const val MASTERY_THRESHOLD_PERCENT = 80
 private const val MASTERY_MIN_SCHEDULED_DAYS = 14
+// Safety bound for walking backward to find 90 *scheduled* days for a habit
+// scheduled very rarely (e.g. once a week needs ~630 calendar days for 90
+// occasions) - generous enough for any realistic weekly pattern, but bounded
+// so the search can't run away.
+private const val MASTERY_MAX_CALENDAR_LOOKBACK_DAYS = 1095
 
 data class HabitStats(
     val currentStreak: Int,

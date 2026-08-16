@@ -65,6 +65,7 @@ object DataExporter {
                         // independent of whether it's actively tracked.
                         put("qualityType", habit.qualityType)
                         put("isTracked", habit.isTracked)
+                        if (habit.manuallyMastered) put("mastery", "manually declared mastered")
                         put("timeOfDay", habit.timeOfDay)
                         put("activeDays", JSONArray(activeDayNames(habit.activeDays)))
                         if (habit.reminderEnabled) {

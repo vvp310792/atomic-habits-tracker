@@ -70,17 +70,26 @@ fun HabitsListScreen(
             }
     }
 
-    // Habit-formation mastery progress per habit (see HabitRepository.computeMastery),
-    // computed here from the already-loaded log history rather than a DB round-trip
-    // per row.
+    // Habit-formation mastery progress per habit: either computed from log
+    // history (HabitRepository.computeMastery, tracked habits only) or a flat
+    // "mastered" reading for a self-declared one (Habit.manuallyMastered) -
+    // which doesn't need any tracking data at all, so it uses a sentinel
+    // scheduledDays that clears the same >=14 "enough evidence" gate the
+    // computed path uses, letting the row-rendering logic stay identical for
+    // both cases.
     val masteryByHabit = remember(habits, allLogs) {
         val doneEpochDaysByHabitId = allLogs
             .filter { it.completed }
             .groupBy({ it.habitId }, { it.dateEpochDay })
             .mapValues { it.value.toSet() }
-        habits
-            .filter { it.isTracked }
-            .associate { h -> h.syncId to app.repository.computeMastery(h, doneEpochDaysByHabitId[h.id].orEmpty()) }
+        habits.mapNotNull { h ->
+            val mastery = when {
+                h.manuallyMastered -> MasteryInfo(progressPercent = 100, scheduledDays = 14, isMastered = true)
+                h.isTracked -> app.repository.computeMastery(h, doneEpochDaysByHabitId[h.id].orEmpty())
+                else -> null
+            }
+            mastery?.let { h.syncId to it }
+        }.toMap()
     }
 
     fun rowClick(habit: Habit) {

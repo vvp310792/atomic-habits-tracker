@@ -65,6 +65,8 @@
     <string name="field_quality_desired">Желаемая</string>
     <string name="field_is_tracked">Отслеживать</string>
     <string name="field_is_tracked_hint">Показывать на экране «Сегодня», с напоминаниями и статистикой. Выключите для справочной записи (библиотека/стек/позыв).</string>
+    <string name="field_manually_mastered">Уже освоено де-факто</string>
+    <string name="field_manually_mastered_hint">Привычка автоматична уже сейчас (например, годами делаете это без приложения) — не нужно набирать 90 дней статистики, чтобы это признать. Голоса за идентичность при этом не копятся, если привычка не отслеживается.</string>
     <string name="field_stack_selected">После: %1$s</string>
     <string name="save">Сохранить</string>
     <string name="delete">Удалить</string>
@@ -123,6 +125,7 @@
     <string name="detail_mastery_done">🎓 Освоено</string>
     <string name="detail_mastery_hint">За последние %1$d запланированных дней — нужно ≥80%%, чтобы привычка считалась освоенной</string>
     <string name="detail_mastery_hint_not_enough_data">Пока недостаточно данных — нужно хотя бы 14 запланированных дней истории</string>
+    <string name="detail_mastery_hint_manual">Отмечено вручную как «уже освоено» — статистика по дням не считается</string>
 
     <!-- Settings -->
     <string name="settings_title">Настройки</string>

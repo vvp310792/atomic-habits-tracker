@@ -100,6 +100,7 @@ fun AddEditHabitScreen(
     var identityLabel by remember { mutableStateOf("") }
     var showIdentityPicker by remember { mutableStateOf(false) }
     var temptationBundle by remember { mutableStateOf("") }
+    var manuallyMastered by remember { mutableStateOf(false) }
     // Not directly user-editable here - only the Goldilocks "Усложнить" flow on
     // the habit detail screen sets this, and it must be preserved (not reset to
     // 0) whenever this screen saves the habit for any other reason.
@@ -151,6 +152,7 @@ fun AddEditHabitScreen(
                 identityId = h.identityId
                 identityLabel = h.identityLabel
                 temptationBundle = h.temptationBundle
+                manuallyMastered = h.manuallyMastered
                 difficultyNote = h.difficultyNote
                 difficultyBumpedAtEpochDay = h.difficultyBumpedAtEpochDay
             }
@@ -185,6 +187,7 @@ fun AddEditHabitScreen(
         identityId = identityId,
         identityLabel = identityLabel,
         temptationBundle = temptationBundle,
+        manuallyMastered = manuallyMastered,
         difficultyNote = difficultyNote,
         difficultyBumpedAtEpochDay = difficultyBumpedAtEpochDay
     )
@@ -258,6 +261,21 @@ fun AddEditHabitScreen(
                 }
                 Text(
                     stringResource(R.string.field_is_tracked_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(stringResource(R.string.field_manually_mastered), style = MaterialTheme.typography.labelLarge)
+                    Switch(checked = manuallyMastered, onCheckedChange = { manuallyMastered = it })
+                }
+                Text(
+                    stringResource(R.string.field_manually_mastered_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )

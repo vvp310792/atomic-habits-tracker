@@ -106,6 +106,7 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
             "difficultyNote" to habit.difficultyNote,
             "difficultyBumpedAtEpochDay" to habit.difficultyBumpedAtEpochDay,
             "temptationBundle" to habit.temptationBundle,
+            "manuallyMastered" to habit.manuallyMastered,
             "updatedAt" to FieldValue.serverTimestamp()
         )
         habitsRef(uid).document(habit.syncId).set(data, SetOptions.merge())
@@ -209,7 +210,8 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
                 identityLabel = doc.getString("identityLabel") ?: "",
                 difficultyNote = doc.getString("difficultyNote") ?: "",
                 difficultyBumpedAtEpochDay = doc.getLong("difficultyBumpedAtEpochDay") ?: 0L,
-                temptationBundle = doc.getString("temptationBundle") ?: ""
+                temptationBundle = doc.getString("temptationBundle") ?: "",
+                manuallyMastered = doc.getBoolean("manuallyMastered") ?: false
             )
             val newLocalId = habitDao.upsert(habit)
             val localId = existing?.id ?: newLocalId

@@ -62,6 +62,17 @@ import androidx.room.PrimaryKey
  * indulgence bundled onto this habit, shown with its own lock badge in the UI
  * rather than folded into [lawAttractive] prose.
  *
+ * Every habit's mastery status can be reached two ways: computed (see
+ * HabitRepository.computeMastery: >=80% of scheduled days over a 90-scheduled-day
+ * window) or self-declared via [manuallyMastered] - for a habit that's honestly
+ * been automatic for years (brushing teeth, say) before this app ever existed,
+ * there's no reason to demand 90 days of fresh logging to admit what's already
+ * true. A manually-mastered habit doesn't need [isTracked] to be true - it can
+ * sit as a pure reference/anchor and still show as mastered. The one thing this
+ * genuinely gives up: an untracked habit generates no completion logs, so a
+ * linked [identityId] earns no fresh "votes" from it - the identity is trusted
+ * as already-embodied by this habit rather than actively re-proven day by day.
+ *
  * Every habit is one universal entity, classified by two independent flags:
  * [qualityType] ("USEFUL" | "HARMFUL" | "NEUTRAL" | "DESIRED") is the honest,
  * judgment-free tag from the Habit Scorecard exercise - what kind of thing this
@@ -103,5 +114,6 @@ data class Habit(
     val identityLabel: String = "",
     val difficultyNote: String = "",
     val difficultyBumpedAtEpochDay: Long = 0,
-    val temptationBundle: String = ""
+    val temptationBundle: String = "",
+    val manuallyMastered: Boolean = false
 )
