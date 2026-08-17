@@ -27,3 +27,11 @@ fun timeOfDayLabel(value: String): String = when (value) {
     "ALL_DAY" -> "Весь день"
     else -> "Утро"
 }
+
+/** Correct Russian declension of "день/дня/дней" for a count. */
+fun declineDays(n: Int): String = when {
+    n % 100 in 11..14 -> "дней"
+    n % 10 == 1 -> "день"
+    n % 10 in 2..4 -> "дня"
+    else -> "дней"
+}

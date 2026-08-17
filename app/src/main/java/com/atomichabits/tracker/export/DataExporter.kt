@@ -7,6 +7,7 @@ import com.atomichabits.tracker.data.HabitDao
 import com.atomichabits.tracker.data.HabitLogDao
 import com.atomichabits.tracker.data.IdentityDao
 import com.atomichabits.tracker.data.ImpulseLogDao
+import com.atomichabits.tracker.data.computeDaysWithout
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -86,6 +87,10 @@ object DataExporter {
                                 put("alternativeSuggestion", habit.alternativeSuggestion)
                             }
                             if (habit.whyItMatters.isNotBlank()) put("whyItMatters", habit.whyItMatters)
+                            if (habit.selfBindingAction.isNotBlank()) put("selfBindingAction", habit.selfBindingAction)
+                            val daysWithout = computeDaysWithout(habit.syncId, habit.createdAtEpochDay, impulseLogs)
+                            put("daysWithoutSlip", daysWithout.currentDays)
+                            put("bestDaysWithoutSlip", daysWithout.bestDays)
                         }
                         if (habit.stackAnchorLabel.isNotBlank()) put("stackedAfter", habit.stackAnchorLabel)
                         if (habit.identityLabel.isNotBlank()) put("linkedIdentity", habit.identityLabel)

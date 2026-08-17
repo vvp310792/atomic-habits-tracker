@@ -92,6 +92,9 @@
     <string name="anchors_alternative_hint">Что сделать вместо этого?</string>
     <string name="anchors_why_label">Почему это важно для меня (необязательно)</string>
     <string name="anchors_why_hint">Например: «Хочу быть внимательным отцом по вечерам»</string>
+    <string name="field_self_binding_label">Self-binding: ограничиваю доступ заранее</string>
+    <string name="field_self_binding_hint">Например: «удаляю приложение на выходные», «оставляю телефон в другой комнате вечером»</string>
+    <string name="field_self_binding_days_without">%1$d %2$s без этой привычки</string>
 
     <!-- 4 laws of James Clear -->
     <string name="laws_title">4 закона атомных привычек</string>

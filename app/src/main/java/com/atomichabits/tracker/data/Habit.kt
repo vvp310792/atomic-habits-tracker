@@ -62,6 +62,16 @@ import androidx.room.PrimaryKey
  * indulgence bundled onto this habit, shown with its own lock badge in the UI
  * rather than folded into [lawAttractive] prose.
  *
+ * Dopamine-balance self-binding (Anna Lembke, "Dopamine Nation"): overcoming an
+ * urge in the moment is much harder than deciding, ahead of time while calm, to
+ * physically remove access. [selfBindingAction] is a free-text description of
+ * that pre-commitment (e.g. "удаляю приложение на выходные", "оставляю телефон
+ * в другой комнате вечером") - meaningful mainly for HARMFUL entries, shown
+ * alongside [alternativeSuggestion] in the editor and on the Impulse screen.
+ * The companion "days without" metric isn't stored on the habit itself - it's
+ * derived from the absence of "CROSS" [ImpulseLog] entries linked to this
+ * habit's syncId, computed in ImpulseRepository.computeDaysWithout.
+ *
  * Every habit's mastery status can be reached two ways: computed (see
  * HabitRepository.computeMastery: >=80% of scheduled days over a 90-scheduled-day
  * window) or self-declared via [manuallyMastered] - for a habit that's honestly
@@ -115,5 +125,6 @@ data class Habit(
     val difficultyNote: String = "",
     val difficultyBumpedAtEpochDay: Long = 0,
     val temptationBundle: String = "",
-    val manuallyMastered: Boolean = false
+    val manuallyMastered: Boolean = false,
+    val selfBindingAction: String = ""
 )

@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
+import com.atomichabits.tracker.util.declineDays
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -80,6 +81,7 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
     var secondsLeft by remember { mutableIntStateOf(WAIT_SECONDS) }
     var linkedAnchorId by remember { mutableStateOf<String?>(null) } // null = not yet chosen
     var linkedAnchorLabel by remember { mutableStateOf("") }
+    val allImpulseLogs by app.impulseRepository.observeAll().collectAsState(initial = emptyList())
 
     LaunchedEffect(sessionKey) {
         secondsLeft = WAIT_SECONDS
@@ -90,8 +92,11 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
     }
 
     val canCheck = secondsLeft <= 0 && linkedAnchorId != null
-    val linkedAlternative = harmful.find { it.syncId == linkedAnchorId }?.alternativeSuggestion.orEmpty()
-    val linkedWhyItMatters = harmful.find { it.syncId == linkedAnchorId }?.whyItMatters.orEmpty()
+    val linkedHabit = harmful.find { it.syncId == linkedAnchorId }
+    val linkedAlternative = linkedHabit?.alternativeSuggestion.orEmpty()
+    val linkedWhyItMatters = linkedHabit?.whyItMatters.orEmpty()
+    val linkedSelfBinding = linkedHabit?.selfBindingAction.orEmpty()
+    val daysWithout = linkedHabit?.let { app.impulseRepository.computeDaysWithout(it, allImpulseLogs) }
 
     Scaffold(
         topBar = {
@@ -144,6 +149,32 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
                                 onClick = { linkedAnchorId = ""; linkedAnchorLabel = "" },
                                 label = { Text(stringResource(R.string.impulse_no_link)) }
                             )
+                        }
+                    }
+
+                    if (linkedHabit != null && daysWithout != null) {
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    "\uD83D\uDEE1 ${daysWithout.currentDays} ${declineDays(daysWithout.currentDays)} без «${linkedHabit.name}»",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                if (daysWithout.bestDays > daysWithout.currentDays) {
+                                    Text(
+                                        "Рекорд: ${daysWithout.bestDays} ${declineDays(daysWithout.bestDays)}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                    )
+                                }
+                                if (linkedSelfBinding.isNotBlank()) {
+                                    Text(
+                                        "\uD83D\uDD10 " + linkedSelfBinding,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
                         }
                     }
 

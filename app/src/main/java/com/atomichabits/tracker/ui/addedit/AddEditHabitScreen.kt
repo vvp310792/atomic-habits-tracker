@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.Habit
+import com.atomichabits.tracker.data.computeDaysWithout
 import com.atomichabits.tracker.notifications.ReminderScheduler
 import com.atomichabits.tracker.ui.components.CategoryPicker
 import com.atomichabits.tracker.ui.components.EmojiPicker
@@ -51,6 +52,7 @@ import com.atomichabits.tracker.ui.components.StackTarget
 import com.atomichabits.tracker.ui.components.WeekdayPicker
 import com.atomichabits.tracker.util.ALL_DAYS_MASK
 import com.atomichabits.tracker.util.categoryColorHex
+import com.atomichabits.tracker.util.declineDays
 import com.atomichabits.tracker.util.TIME_OF_DAY_VALUES
 import com.atomichabits.tracker.util.timeOfDayLabel
 import kotlinx.coroutines.delay
@@ -101,6 +103,7 @@ fun AddEditHabitScreen(
     var showIdentityPicker by remember { mutableStateOf(false) }
     var temptationBundle by remember { mutableStateOf("") }
     var manuallyMastered by remember { mutableStateOf(false) }
+    var selfBindingAction by remember { mutableStateOf("") }
     // Not directly user-editable here - only the Goldilocks "Усложнить" flow on
     // the habit detail screen sets this, and it must be preserved (not reset to
     // 0) whenever this screen saves the habit for any other reason.
@@ -153,6 +156,7 @@ fun AddEditHabitScreen(
                 identityLabel = h.identityLabel
                 temptationBundle = h.temptationBundle
                 manuallyMastered = h.manuallyMastered
+                selfBindingAction = h.selfBindingAction
                 difficultyNote = h.difficultyNote
                 difficultyBumpedAtEpochDay = h.difficultyBumpedAtEpochDay
             }
@@ -188,6 +192,7 @@ fun AddEditHabitScreen(
         identityLabel = identityLabel,
         temptationBundle = temptationBundle,
         manuallyMastered = manuallyMastered,
+        selfBindingAction = selfBindingAction,
         difficultyNote = difficultyNote,
         difficultyBumpedAtEpochDay = difficultyBumpedAtEpochDay
     )
@@ -298,6 +303,27 @@ fun AddEditHabitScreen(
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth()
                 )
+                OutlinedTextField(
+                    value = selfBindingAction,
+                    onValueChange = { selfBindingAction = it },
+                    label = { Text(stringResource(R.string.field_self_binding_label)) },
+                    placeholder = { Text(stringResource(R.string.field_self_binding_hint)) },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (id != 0L) {
+                    val allImpulseLogs by app.impulseRepository.observeAll().collectAsState(initial = emptyList())
+                    val daysWithout = remember(allImpulseLogs, syncId, createdAtEpochDay) {
+                        computeDaysWithout(syncId, createdAtEpochDay, allImpulseLogs)
+                    }
+                    if (daysWithout.currentDays > 0) {
+                        Text(
+                            "\uD83D\uDEE1 " + stringResource(R.string.field_self_binding_days_without, daysWithout.currentDays, declineDays(daysWithout.currentDays)),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

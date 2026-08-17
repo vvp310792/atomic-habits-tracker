@@ -37,12 +37,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
+import com.atomichabits.tracker.data.DaysWithoutInfo
 import com.atomichabits.tracker.data.Habit
 import com.atomichabits.tracker.data.MasteryInfo
 import com.atomichabits.tracker.ui.components.CategoryTag
 import com.atomichabits.tracker.ui.components.CrossGroupDraggableSections
 import com.atomichabits.tracker.ui.components.DragGroup
 import com.atomichabits.tracker.util.TIME_OF_DAY_VALUES
+import com.atomichabits.tracker.util.declineDays
 import com.atomichabits.tracker.util.timeOfDayLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,6 +92,13 @@ fun HabitsListScreen(
             }
             mastery?.let { h.syncId to it }
         }.toMap()
+    }
+
+    // "Days without" for HARMFUL habits (Anna Lembke's dopamine-balance framing -
+    // see ImpulseRepository.computeDaysWithout). Only meaningful for the red
+    // section, so only computed for those.
+    val daysWithoutByHabit = remember(redHabits, impulseLogs) {
+        redHabits.associate { h -> h.syncId to app.impulseRepository.computeDaysWithout(h, impulseLogs) }
     }
 
     fun rowClick(habit: Habit) {
@@ -140,6 +149,7 @@ fun HabitsListScreen(
                     habits = redHabits,
                     impulseScoreByHabit = impulseScoreByHabit,
                     masteryByHabit = masteryByHabit,
+                    daysWithoutByHabit = daysWithoutByHabit,
                     onAdd = { onAddHabit("HARMFUL", false) },
                     onMove = { habit, toTime -> app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
                     onReorder = { orderedItems -> app.launchPersistent { app.repository.reorder(orderedItems.map { it.id }) } },
@@ -206,6 +216,7 @@ private fun ColoredQualitySection(
     habits: List<Habit>,
     impulseScoreByHabit: Map<String, Pair<Int, Int>>,
     masteryByHabit: Map<String, MasteryInfo>,
+    daysWithoutByHabit: Map<String, DaysWithoutInfo> = emptyMap(),
     onAdd: () -> Unit,
     onMove: (Habit, String) -> Unit,
     onReorder: (List<Habit>) -> Unit,
@@ -250,7 +261,7 @@ private fun ColoredQualitySection(
                     onReorder = { _, orderedChains -> onReorder(orderedChains.flatMap { it.habits }) },
                     emptyGroupHint = stringResource(R.string.home_group_empty_hint)
                 ) { chain, isDragging ->
-                    HabitChainBlock(chain, impulseScoreByHabit, masteryByHabit, isDragging, onClick)
+                    HabitChainBlock(chain, impulseScoreByHabit, masteryByHabit, daysWithoutByHabit, isDragging, onClick)
                 }
             }
         }
@@ -268,13 +279,14 @@ private fun HabitChainBlock(
     chain: HabitChain,
     impulseScoreByHabit: Map<String, Pair<Int, Int>>,
     masteryByHabit: Map<String, MasteryInfo>,
+    daysWithoutByHabit: Map<String, DaysWithoutInfo>,
     isDragging: Boolean,
     onClick: (Habit) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         chain.habits.forEachIndexed { index, habit ->
             if (index == 0) {
-                UniversalHabitRow(habit, impulseScoreByHabit[habit.syncId], masteryByHabit[habit.syncId]) { onClick(habit) }
+                UniversalHabitRow(habit, impulseScoreByHabit[habit.syncId], masteryByHabit[habit.syncId], daysWithoutByHabit[habit.syncId]) { onClick(habit) }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Spacer(Modifier.size(20.dp))
@@ -285,7 +297,7 @@ private fun HabitChainBlock(
                         modifier = Modifier.padding(end = 4.dp)
                     )
                     Box(modifier = Modifier.weight(1f)) {
-                        UniversalHabitRow(habit, impulseScoreByHabit[habit.syncId], masteryByHabit[habit.syncId]) { onClick(habit) }
+                        UniversalHabitRow(habit, impulseScoreByHabit[habit.syncId], masteryByHabit[habit.syncId], daysWithoutByHabit[habit.syncId]) { onClick(habit) }
                     }
                 }
             }
@@ -294,7 +306,7 @@ private fun HabitChainBlock(
 }
 
 @Composable
-private fun UniversalHabitRow(habit: Habit, impulseScore: Pair<Int, Int>?, mastery: MasteryInfo?, onClick: () -> Unit) {
+private fun UniversalHabitRow(habit: Habit, impulseScore: Pair<Int, Int>?, mastery: MasteryInfo?, daysWithout: DaysWithoutInfo?, onClick: () -> Unit) {
     val accent = remember(habit.colorHex) {
         runCatching { Color(android.graphics.Color.parseColor(habit.colorHex)) }
             .getOrDefault(Color(0xFF7C6CF0))
@@ -372,6 +384,13 @@ private fun UniversalHabitRow(habit: Habit, impulseScore: Pair<Int, Int>?, maste
                         "\u26A1 ${impulseScore.first}:${impulseScore.second}",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                if (daysWithout != null && daysWithout.currentDays > 0) {
+                    Text(
+                        "\uD83D\uDEE1 ${daysWithout.currentDays} ${declineDays(daysWithout.currentDays)} без",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
                 if (mastery != null && mastery.scheduledDays >= 14) {
