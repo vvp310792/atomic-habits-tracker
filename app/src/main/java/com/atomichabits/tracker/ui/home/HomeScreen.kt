@@ -251,7 +251,7 @@ fun HomeScreen(
                         stringResource(R.string.home_section_held),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(horizontal = 16.dp, top = 8.dp, bottom = 4.dp)
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp)
                     )
                 }
                 items(trackedHarmful, key = { "held_${it.id}" }) { habit ->
