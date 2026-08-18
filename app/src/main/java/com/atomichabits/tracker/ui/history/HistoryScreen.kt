@@ -1,5 +1,6 @@
 package com.atomichabits.tracker.ui.history
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,6 +47,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -93,6 +97,7 @@ fun HistoryScreen(app: HabitTrackerApp, onOpenHabit: (Long) -> Unit) {
                 0 -> CalendarTab(
                     habits = trackedHabits,
                     allLogs = allLogs,
+                    impulseLogs = impulseLogs,
                     stats = stats,
                     today = today,
                     visibleMonth = visibleMonth,
@@ -204,6 +209,7 @@ private fun computeHistoryStats(habits: List<Habit>, allLogs: List<HabitLog>, to
 private fun CalendarTab(
     habits: List<Habit>,
     allLogs: List<HabitLog>,
+    impulseLogs: List<ImpulseLog>,
     stats: HistoryStats,
     today: LocalDate,
     visibleMonth: YearMonth,
@@ -254,6 +260,11 @@ private fun CalendarTab(
                 visibleMonth = visibleMonth,
                 onMonthChange = onMonthChange
             )
+            Spacer(Modifier.size(20.dp))
+        }
+
+        item {
+            ImpulseTrendChart(logs = impulseLogs, today = today)
             Spacer(Modifier.size(20.dp))
         }
 
@@ -369,6 +380,122 @@ private fun MonthCalendar(
                 }
             }
         }
+    }
+}
+
+// endregion
+
+// region ---- Impulse ("Позыв") trend chart ----
+
+/**
+ * Stacked daily bar chart of the last [days] days of "Позыв" activity: the
+ * green portion is CHECK (urge held), stacked with a red portion for CROSS
+ * (gave in) on top - both counted per day, same drawing approach as
+ * [com.atomichabits.tracker.ui.components.CompletionBarChart]. Days with no
+ * logged urges at all show a small neutral baseline mark rather than nothing,
+ * so an empty day still reads as a data point, not a rendering gap.
+ */
+@Composable
+private fun ImpulseTrendChart(logs: List<ImpulseLog>, today: LocalDate, days: Int = 30) {
+    val checkColor = MaterialTheme.colorScheme.primary
+    val crossColor = MaterialTheme.colorScheme.error
+    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+
+    val since = today.minusDays((days - 1).toLong())
+    val byDate = remember(logs) { logs.groupBy { it.dateEpochDay } }
+    val totalChecks = remember(logs) { logs.count { it.outcome == "CHECK" } }
+    val totalCrosses = remember(logs) { logs.count { it.outcome == "CROSS" } }
+    val total = totalChecks + totalCrosses
+    val successPercent = if (total == 0) 0 else (totalChecks * 100 / total)
+
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    stringResource(R.string.history_impulse_chart_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                if (total > 0) {
+                    Text("$successPercent%", style = MaterialTheme.typography.titleMedium, color = checkColor)
+                }
+            }
+            Text(
+                if (total == 0) {
+                    stringResource(R.string.history_impulse_chart_empty)
+                } else {
+                    stringResource(R.string.history_impulse_chart_subtitle, totalChecks, totalCrosses)
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+
+            if (total > 0) {
+                Spacer(Modifier.size(12.dp))
+                val maxPerDay = remember(byDate, since, days) {
+                    (0 until days).maxOf { offset ->
+                        byDate[since.plusDays(offset.toLong()).toEpochDay()]?.size ?: 0
+                    }.coerceAtLeast(1)
+                }
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                ) {
+                    val gap = 3.dp.toPx()
+                    val barWidth = (size.width - gap * (days - 1)) / days
+                    val cornerRadius = CornerRadius(barWidth / 2.5f, barWidth / 2.5f)
+                    for (i in 0 until days) {
+                        val date = since.plusDays(i.toLong())
+                        val dayLogs = byDate[date.toEpochDay()].orEmpty()
+                        val checks = dayLogs.count { it.outcome == "CHECK" }
+                        val crosses = dayLogs.count { it.outcome == "CROSS" }
+                        val x = i * (barWidth + gap)
+                        if (checks == 0 && crosses == 0) {
+                            drawRoundRect(
+                                color = trackColor,
+                                topLeft = Offset(x, size.height - size.height * 0.06f),
+                                size = Size(barWidth, size.height * 0.06f),
+                                cornerRadius = cornerRadius
+                            )
+                        } else {
+                            val checkHeight = size.height * (checks.toFloat() / maxPerDay)
+                            val crossHeight = size.height * (crosses.toFloat() / maxPerDay)
+                            if (checkHeight > 0) {
+                                drawRoundRect(
+                                    color = checkColor,
+                                    topLeft = Offset(x, size.height - checkHeight),
+                                    size = Size(barWidth, checkHeight),
+                                    cornerRadius = cornerRadius
+                                )
+                            }
+                            if (crossHeight > 0) {
+                                drawRoundRect(
+                                    color = crossColor,
+                                    topLeft = Offset(x, size.height - checkHeight - crossHeight),
+                                    size = Size(barWidth, crossHeight),
+                                    cornerRadius = cornerRadius
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.size(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    ImpulseLegendDot(checkColor, stringResource(R.string.history_impulse_legend_check))
+                    ImpulseLegendDot(crossColor, stringResource(R.string.history_impulse_legend_cross))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImpulseLegendDot(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(10.dp).background(color, CircleShape))
+        Spacer(Modifier.size(4.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
     }
 }
 

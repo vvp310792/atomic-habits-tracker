@@ -71,7 +71,10 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
     val crosses = todaysLogs.count { it.outcome == "CROSS" }
 
     val anchors by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
-    val harmful = anchors.filter { it.qualityType == "HARMFUL" }
+    // Only tracked HARMFUL habits are pickable here - an untracked one is a
+    // library/reference entry (not something actively being worked on), so it
+    // has no business showing up as an urge target.
+    val harmful = anchors.filter { it.qualityType == "HARMFUL" && it.isTracked }
 
     var showReflection by remember { mutableStateOf(false) }
     var selectedTags by remember { mutableStateOf(setOf<String>()) }

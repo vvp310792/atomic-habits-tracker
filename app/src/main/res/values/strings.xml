@@ -28,6 +28,11 @@
     <string name="history_stat_habits_fraction">Привычки: %1$d/%2$d</string>
     <string name="history_stat_perfect_days">Идеальные дни</string>
     <string name="history_statistics_title">Статистика</string>
+    <string name="history_impulse_chart_title">Преодолённые позывы</string>
+    <string name="history_impulse_chart_subtitle">Удержано: %1$d · Поддался: %2$d</string>
+    <string name="history_impulse_chart_empty">Пока нет отметок на экране «Позыв»</string>
+    <string name="history_impulse_legend_check">Удержался</string>
+    <string name="history_impulse_legend_cross">Поддался</string>
     <string name="history_avg_completion">Сред. доля завершённых</string>
     <string name="history_habit_total">Всего выполнено: %1$d</string>
 

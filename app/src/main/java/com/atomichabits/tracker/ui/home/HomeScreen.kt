@@ -60,7 +60,10 @@ fun HomeScreen(
     onOpenHabit: (Long) -> Unit
 ) {
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
-    val trackedHabits = remember(habits) { habits.filter { it.isTracked } }
+    // "Сегодня" is for habits you're actively building (USEFUL/NEUTRAL/DESIRED) -
+    // HARMFUL ones live on the "Позыв" screen instead (see ImpulseScreen), since
+    // checking off "did the bad thing" doesn't make sense as a daily checkbox.
+    val trackedHabits = remember(habits) { habits.filter { it.isTracked && it.qualityType != "HARMFUL" } }
     val today = remember { LocalDate.now() }
     // Full current week Monday..Sunday, so "today" sits wherever its weekday
     // falls rather than always being the last/rightmost item.
