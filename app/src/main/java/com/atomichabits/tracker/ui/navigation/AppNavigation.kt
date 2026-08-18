@@ -56,6 +56,7 @@ object Routes {
     const val ARG_INITIAL_NAME = "initialName"
     const val ARG_INITIAL_TYPE = "initialType"
     const val ARG_INITIAL_TRACKED = "initialTracked"
+    const val ARG_ANCHOR_ID = "anchorId"
 
     fun addEdit(
         habitId: Long? = null,
@@ -146,12 +147,19 @@ fun AppNavigation(app: HabitTrackerApp) {
                 HomeScreen(
                     app = app,
                     onAddHabit = { navController.navigate(Routes.addEdit()) },
-                    onOpenHabit = { id -> navController.navigate(Routes.detail(id)) }
+                    onOpenHabit = { id -> navController.navigate(Routes.detail(id)) },
+                    onOpenImpulse = { anchorId ->
+                        navController.navigate(Routes.IMPULSE) { launchSingleTop = true }
+                        navController.currentBackStackEntry?.savedStateHandle?.set(Routes.ARG_ANCHOR_ID, anchorId)
+                    }
                 )
             }
 
-            composable(Routes.IMPULSE) {
-                ImpulseScreen(app = app)
+            composable(Routes.IMPULSE) { entry ->
+                ImpulseScreen(
+                    app = app,
+                    initialAnchorId = entry.savedStateHandle.remove<String>(Routes.ARG_ANCHOR_ID)
+                )
             }
 
             composable(Routes.HABITS) {

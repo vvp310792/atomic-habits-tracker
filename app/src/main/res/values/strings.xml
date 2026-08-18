@@ -7,6 +7,10 @@
     <string name="home_empty">Пока нет привычек. Нажмите «+», чтобы добавить первую.</string>
     <string name="home_group_empty_hint">Перетащите сюда</string>
     <string name="home_week_progress">Дни, завершённые на этой неделе: %1$d/%2$d</string>
+    <string name="home_section_done">\u2705 Сделал</string>
+    <string name="home_section_held">\uD83D\uDEE1 Устоял</string>
+    <string name="home_held_clean_today">Сегодня чисто</string>
+    <string name="home_held_slip_today">Был срыв сегодня</string>
     <string name="habits_title">Ваши привычки</string>
     <string name="habits_section_tracked">Создаваемые привычки</string>
     <string name="habits_section_green">Создаваемые и полезные</string>

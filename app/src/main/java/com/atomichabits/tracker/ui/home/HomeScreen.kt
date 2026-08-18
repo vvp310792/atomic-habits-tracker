@@ -1,8 +1,10 @@
 package com.atomichabits.tracker.ui.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,11 +39,13 @@ import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.Habit
+import com.atomichabits.tracker.data.computeDaysWithout
 import com.atomichabits.tracker.ui.components.CrossGroupDraggableSections
 import com.atomichabits.tracker.ui.components.DateProgressRing
 import com.atomichabits.tracker.ui.components.DragGroup
 import com.atomichabits.tracker.ui.components.HabitCard
 import com.atomichabits.tracker.util.TIME_OF_DAY_VALUES
+import com.atomichabits.tracker.util.declineDays
 import com.atomichabits.tracker.util.isHabitScheduledOn
 import com.atomichabits.tracker.util.timeOfDayLabel
 import java.time.LocalDate
@@ -57,13 +61,16 @@ private val FILTERS = listOf("ALL", "MORNING", "DAY", "EVENING", "ALL_DAY")
 fun HomeScreen(
     app: HabitTrackerApp,
     onAddHabit: () -> Unit,
-    onOpenHabit: (Long) -> Unit
+    onOpenHabit: (Long) -> Unit,
+    onOpenImpulse: (String) -> Unit
 ) {
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
-    // "Сегодня" is for habits you're actively building (USEFUL/NEUTRAL/DESIRED) -
-    // HARMFUL ones live on the "Позыв" screen instead (see ImpulseScreen), since
-    // checking off "did the bad thing" doesn't make sense as a daily checkbox.
+    // "Сделал" (green) is for habits you're actively building (USEFUL/NEUTRAL/
+    // DESIRED) - HARMFUL ones live in the "Устоял" (red) section below instead,
+    // since checking off "did the bad thing" isn't a meaningful daily checkbox.
     val trackedHabits = remember(habits) { habits.filter { it.isTracked && it.qualityType != "HARMFUL" } }
+    val trackedHarmful = remember(habits) { habits.filter { it.isTracked && it.qualityType == "HARMFUL" } }
+    val impulseLogs by app.impulseRepository.observeAll().collectAsState(initial = emptyList())
     val today = remember { LocalDate.now() }
     // Full current week Monday..Sunday, so "today" sits wherever its weekday
     // falls rather than always being the last/rightmost item.
@@ -172,6 +179,15 @@ fun HomeScreen(
             }
 
             item {
+                Text(
+                    stringResource(R.string.home_section_done),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+            }
+
+            item {
                 CrossGroupDraggableSections(
                     groups = visibleTimeGroups,
                     itemKey = { it.id },
@@ -227,6 +243,72 @@ fun HomeScreen(
                         modifier = Modifier.padding(14.dp)
                     )
                 }
+            }
+
+            if (selectedDate == today && trackedHarmful.isNotEmpty()) {
+                item {
+                    Text(
+                        stringResource(R.string.home_section_held),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 16.dp, top = 8.dp, bottom = 4.dp)
+                    )
+                }
+                items(trackedHarmful, key = { "held_${it.id}" }) { habit ->
+                    val daysWithout = remember(habit, impulseLogs) {
+                        computeDaysWithout(habit.syncId, habit.createdAtEpochDay, impulseLogs)
+                    }
+                    val hadSlipToday = remember(habit, impulseLogs, today) {
+                        impulseLogs.any {
+                            it.linkedHarmfulAnchorId == habit.syncId &&
+                                it.outcome == "CROSS" &&
+                                it.dateEpochDay == today.toEpochDay()
+                        }
+                    }
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
+                        HeldTodayCard(
+                            habit = habit,
+                            hadSlipToday = hadSlipToday,
+                            daysWithout = daysWithout.currentDays,
+                            onClick = { onOpenImpulse(habit.syncId) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeldTodayCard(habit: Habit, hadSlipToday: Boolean, daysWithout: Int, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text("${habit.emoji} ${habit.name}", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    if (hadSlipToday) stringResource(R.string.home_held_slip_today)
+                    else stringResource(R.string.home_held_clean_today),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                )
+            }
+            if (daysWithout > 0) {
+                Text(
+                    "\uD83D\uDEE1 $daysWithout ${declineDays(daysWithout)}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
             }
         }
     }

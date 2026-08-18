@@ -63,7 +63,7 @@ private const val WAIT_SECONDS = 120
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
+fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null, initialAnchorId: String? = null) {
     val scope = rememberCoroutineScope()
     val today = remember { LocalDate.now() }
     val todaysLogs by app.impulseRepository.observeForDate(today).collectAsState(initial = emptyList())
@@ -82,9 +82,17 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null) {
     var justLogged by remember { mutableStateOf<String?>(null) }
     var sessionKey by remember { mutableIntStateOf(0) }
     var secondsLeft by remember { mutableIntStateOf(WAIT_SECONDS) }
-    var linkedAnchorId by remember { mutableStateOf<String?>(null) } // null = not yet chosen
+    var linkedAnchorId by remember { mutableStateOf(initialAnchorId) } // null = not yet chosen
     var linkedAnchorLabel by remember { mutableStateOf("") }
     val allImpulseLogs by app.impulseRepository.observeAll().collectAsState(initial = emptyList())
+
+    // If we arrived pre-selected (from the "Устоял" section on Home), fill in
+    // the label once the habit list has loaded enough to find it by id.
+    LaunchedEffect(harmful, initialAnchorId) {
+        if (initialAnchorId != null && linkedAnchorId == initialAnchorId && linkedAnchorLabel.isBlank()) {
+            harmful.find { it.syncId == initialAnchorId }?.let { linkedAnchorLabel = it.name }
+        }
+    }
 
     LaunchedEffect(sessionKey) {
         secondsLeft = WAIT_SECONDS
