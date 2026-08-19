@@ -35,6 +35,7 @@
     <string name="history_impulse_chart_title">Преодолённые позывы</string>
     <string name="history_impulse_chart_subtitle">Удержано: %1$d · Поддался: %2$d</string>
     <string name="history_impulse_chart_empty">Пока нет отметок на экране «Позыв»</string>
+    <string name="history_impulse_chart_no_habits">Нет отслеживаемых вредных привычек</string>
     <string name="history_impulse_legend_check">Удержался</string>
     <string name="history_impulse_legend_cross">Поддался</string>
     <string name="history_avg_completion">Сред. доля завершённых</string>

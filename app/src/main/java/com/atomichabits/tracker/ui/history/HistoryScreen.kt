@@ -71,6 +71,7 @@ import java.time.temporal.ChronoUnit
 fun HistoryScreen(app: HabitTrackerApp, onOpenHabit: (Long) -> Unit) {
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
     val trackedHabits = remember(habits) { habits.filter { it.isTracked } }
+    val trackedHarmfulHabits = remember(habits) { habits.filter { it.isTracked && it.qualityType == "HARMFUL" } }
     val allLogs by app.repository.observeAllLogs().collectAsState(initial = emptyList())
     val impulseLogs by app.impulseRepository.observeAll().collectAsState(initial = emptyList())
     val today = remember { LocalDate.now() }
@@ -98,6 +99,7 @@ fun HistoryScreen(app: HabitTrackerApp, onOpenHabit: (Long) -> Unit) {
                     habits = trackedHabits,
                     allLogs = allLogs,
                     impulseLogs = impulseLogs,
+                    harmfulHabits = trackedHarmfulHabits,
                     stats = stats,
                     today = today,
                     visibleMonth = visibleMonth,
@@ -210,6 +212,7 @@ private fun CalendarTab(
     habits: List<Habit>,
     allLogs: List<HabitLog>,
     impulseLogs: List<ImpulseLog>,
+    harmfulHabits: List<Habit>,
     stats: HistoryStats,
     today: LocalDate,
     visibleMonth: YearMonth,
@@ -264,7 +267,7 @@ private fun CalendarTab(
         }
 
         item {
-            ImpulseTrendChart(logs = impulseLogs, today = today)
+            ImpulseTrendChart(habits = harmfulHabits, logs = impulseLogs, today = today)
             Spacer(Modifier.size(20.dp))
         }
 
@@ -388,25 +391,51 @@ private fun MonthCalendar(
 // region ---- Impulse ("Позыв") trend chart ----
 
 /**
- * Stacked daily bar chart of the last [days] days of "Позыв" activity: the
- * green portion is CHECK (urge held), stacked with a red portion for CROSS
- * (gave in) on top - both counted per day, same drawing approach as
- * [com.atomichabits.tracker.ui.components.CompletionBarChart]. Days with no
- * logged urges at all show a small neutral baseline mark rather than nothing,
- * so an empty day still reads as a data point, not a rendering gap.
+ * Stacked daily bar chart of the last [days] days of "Позыв" activity, counted
+ * per (tracked HARMFUL habit, day) rather than per logged event: a CLOSED
+ * (already-finished) day with no logged CROSS counts as held even with zero
+ * explicit check-ins that day - staying quiet about an urge that never got
+ * logged is still a real day without a slip, same logic as
+ * [com.atomichabits.tracker.data.computeDaysWithout]'s "days without". TODAY is treated differently: it's still open, so it only
+ * counts as held once an explicit CHECK is logged - crediting it in advance
+ * would be crediting a verdict the day hasn't actually reached yet.
  */
 @Composable
-private fun ImpulseTrendChart(logs: List<ImpulseLog>, today: LocalDate, days: Int = 30) {
+private fun ImpulseTrendChart(habits: List<Habit>, logs: List<ImpulseLog>, today: LocalDate, days: Int = 30) {
     val checkColor = MaterialTheme.colorScheme.primary
     val crossColor = MaterialTheme.colorScheme.error
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
 
     val since = today.minusDays((days - 1).toLong())
-    val byDate = remember(logs) { logs.groupBy { it.dateEpochDay } }
-    val totalChecks = remember(logs) { logs.count { it.outcome == "CHECK" } }
-    val totalCrosses = remember(logs) { logs.count { it.outcome == "CROSS" } }
-    val total = totalChecks + totalCrosses
-    val successPercent = if (total == 0) 0 else (totalChecks * 100 / total)
+
+    val crossByHabitDay = remember(logs) {
+        logs.filter { it.outcome == "CROSS" }.map { it.linkedHarmfulAnchorId to it.dateEpochDay }.toSet()
+    }
+    val checkByHabitDay = remember(logs) {
+        logs.filter { it.outcome == "CHECK" }.map { it.linkedHarmfulAnchorId to it.dateEpochDay }.toSet()
+    }
+    val perDay = remember(habits, crossByHabitDay, checkByHabitDay, since, days, today) {
+        (0 until days).associate { offset ->
+            val date = since.plusDays(offset.toLong())
+            val epochDay = date.toEpochDay()
+            var held = 0
+            var crossed = 0
+            habits.forEach { h ->
+                val createdDate = if (h.createdAtEpochDay > 0) LocalDate.ofEpochDay(h.createdAtEpochDay) else date
+                if (date.isBefore(createdDate)) return@forEach
+                when {
+                    (h.syncId to epochDay) in crossByHabitDay -> crossed++
+                    date.isBefore(today) -> held++
+                    (h.syncId to epochDay) in checkByHabitDay -> held++
+                }
+            }
+            epochDay to (held to crossed)
+        }
+    }
+    val totalHeld = perDay.values.sumOf { it.first }
+    val totalCrossed = perDay.values.sumOf { it.second }
+    val total = totalHeld + totalCrossed
+    val successPercent = if (total == 0) 0 else (totalHeld * 100 / total)
 
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -421,10 +450,12 @@ private fun ImpulseTrendChart(logs: List<ImpulseLog>, today: LocalDate, days: In
                 }
             }
             Text(
-                if (total == 0) {
+                if (habits.isEmpty()) {
+                    stringResource(R.string.history_impulse_chart_no_habits)
+                } else if (total == 0) {
                     stringResource(R.string.history_impulse_chart_empty)
                 } else {
-                    stringResource(R.string.history_impulse_chart_subtitle, totalChecks, totalCrosses)
+                    stringResource(R.string.history_impulse_chart_subtitle, totalHeld, totalCrossed)
                 },
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
@@ -432,10 +463,8 @@ private fun ImpulseTrendChart(logs: List<ImpulseLog>, today: LocalDate, days: In
 
             if (total > 0) {
                 Spacer(Modifier.size(12.dp))
-                val maxPerDay = remember(byDate, since, days) {
-                    (0 until days).maxOf { offset ->
-                        byDate[since.plusDays(offset.toLong()).toEpochDay()]?.size ?: 0
-                    }.coerceAtLeast(1)
+                val maxPerDay = remember(perDay) {
+                    perDay.values.maxOf { it.first + it.second }.coerceAtLeast(1)
                 }
                 Canvas(
                     modifier = Modifier
@@ -446,12 +475,10 @@ private fun ImpulseTrendChart(logs: List<ImpulseLog>, today: LocalDate, days: In
                     val barWidth = (size.width - gap * (days - 1)) / days
                     val cornerRadius = CornerRadius(barWidth / 2.5f, barWidth / 2.5f)
                     for (i in 0 until days) {
-                        val date = since.plusDays(i.toLong())
-                        val dayLogs = byDate[date.toEpochDay()].orEmpty()
-                        val checks = dayLogs.count { it.outcome == "CHECK" }
-                        val crosses = dayLogs.count { it.outcome == "CROSS" }
+                        val epochDay = since.plusDays(i.toLong()).toEpochDay()
+                        val (held, crossed) = perDay[epochDay] ?: (0 to 0)
                         val x = i * (barWidth + gap)
-                        if (checks == 0 && crosses == 0) {
+                        if (held == 0 && crossed == 0) {
                             drawRoundRect(
                                 color = trackColor,
                                 topLeft = Offset(x, size.height - size.height * 0.06f),
@@ -459,8 +486,8 @@ private fun ImpulseTrendChart(logs: List<ImpulseLog>, today: LocalDate, days: In
                                 cornerRadius = cornerRadius
                             )
                         } else {
-                            val checkHeight = size.height * (checks.toFloat() / maxPerDay)
-                            val crossHeight = size.height * (crosses.toFloat() / maxPerDay)
+                            val checkHeight = size.height * (held.toFloat() / maxPerDay)
+                            val crossHeight = size.height * (crossed.toFloat() / maxPerDay)
                             if (checkHeight > 0) {
                                 drawRoundRect(
                                     color = checkColor,

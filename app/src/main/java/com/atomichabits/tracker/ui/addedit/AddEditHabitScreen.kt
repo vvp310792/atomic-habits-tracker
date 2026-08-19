@@ -311,7 +311,7 @@ fun AddEditHabitScreen(
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth()
                 )
-                if (id != 0L) {
+                if (id != 0L && isTracked) {
                     val allImpulseLogs by app.impulseRepository.observeAll().collectAsState(initial = emptyList())
                     val daysWithout = remember(allImpulseLogs, syncId, createdAtEpochDay) {
                         computeDaysWithout(syncId, createdAtEpochDay, allImpulseLogs)

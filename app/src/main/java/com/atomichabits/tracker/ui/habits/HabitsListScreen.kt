@@ -98,7 +98,12 @@ fun HabitsListScreen(
     // see ImpulseRepository.computeDaysWithout). Only meaningful for the red
     // section, so only computed for those.
     val daysWithoutByHabit = remember(redHabits, impulseLogs) {
-        redHabits.associate { h -> h.syncId to app.impulseRepository.computeDaysWithout(h, impulseLogs) }
+        // Only tracked habits get a "days without" count - an untracked one is a
+        // library reference, not something actively being resisted, so the metric
+        // isn't meaningful for it (see ImpulseScreen, which already excludes
+        // untracked HARMFUL habits from the urge picker for the same reason).
+        redHabits.filter { it.isTracked }
+            .associate { h -> h.syncId to app.impulseRepository.computeDaysWithout(h, impulseLogs) }
     }
 
     fun rowClick(habit: Habit) {

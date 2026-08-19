@@ -158,6 +158,7 @@ fun AppNavigation(app: HabitTrackerApp) {
             composable(Routes.IMPULSE) { entry ->
                 ImpulseScreen(
                     app = app,
+                    onBack = { navController.popBackStack() },
                     initialAnchorId = entry.savedStateHandle.remove<String>(Routes.ARG_ANCHOR_ID)
                 )
             }
