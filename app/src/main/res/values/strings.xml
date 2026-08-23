@@ -47,8 +47,6 @@
     <string name="impulse_link_hint">К какой привычке это относится? (необязательно)</string>
     <string name="impulse_link_hint_required">Выберите тег — хотя бы «Без привязки», чтобы продолжить</string>
     <string name="impulse_no_link">Без привязки</string>
-    <string name="impulse_breathing_hint">Квадратное дыхание: вдох — задержка — выдох — задержка, по 3 секунды каждая</string>
-    <string name="impulse_wait_hint">Квадратное дыхание: вдох — задержка — выдох — задержка, по 3 секунды каждая. Галочка станет доступна через 2 минуты</string>
     <string name="impulse_check">Удержался</string>
     <string name="impulse_cross">Поддался</string>
     <string name="impulse_logged">Записано!</string>
@@ -187,6 +185,8 @@
     <string name="settings_export_button">Экспортировать и поделиться</string>
     <string name="settings_export_in_progress">Готовим файл…</string>
     <string name="settings_export_error">Не удалось создать файл экспорта</string>
+    <string name="settings_breathing_section">Квадратное дыхание</string>
+    <string name="settings_breathing_hint">Длительность каждой фазы (вдох / задержка / выдох / задержка) на экране «Позыв»</string>
     <string name="settings_updates_section">Обновления</string>
     <string name="settings_updates_current">Установлена версия %1$s (build %2$d)</string>
     <string name="settings_updates_check">Проверить обновления</string>

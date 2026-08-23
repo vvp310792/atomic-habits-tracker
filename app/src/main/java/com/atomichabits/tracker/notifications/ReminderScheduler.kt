@@ -22,7 +22,7 @@ object ReminderScheduler {
         }
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-        val triggerAt = nextTriggerMillis(habit.reminderHour, habit.reminderMinute)
+        val triggerAt = nextTriggerMillis(habit.reminderHour, habit.reminderMinute, habit.activeDays)
         val intent = Intent(context, ReminderReceiver::class.java).apply {
             action = ReminderReceiver.ACTION_SHOW_REMINDER
             putExtra(NotificationHelper.EXTRA_HABIT_ID, habit.id)
@@ -54,7 +54,20 @@ object ReminderScheduler {
         alarmManager.cancel(pendingIntent)
     }
 
-    private fun nextTriggerMillis(hour: Int, minute: Int): Long {
+    /**
+     * True if [calendar]'s day-of-week is one of [activeDays]'s scheduled days.
+     * Same Monday=bit0..Sunday=bit6 convention as HabitRepository.isActiveOn,
+     * just re-derived from java.util.Calendar's DAY_OF_WEEK (1=Sunday..7=Saturday)
+     * instead of java.time, since AlarmManager scheduling here already works in
+     * Calendar for historical reasons.
+     */
+    fun isActiveOn(activeDays: Int, calendar: Calendar): Boolean {
+        val dow = calendar.get(Calendar.DAY_OF_WEEK) // 1=Sunday..7=Saturday
+        val bit = if (dow == Calendar.SUNDAY) 6 else dow - 2
+        return (activeDays shr bit) and 1 == 1
+    }
+
+    private fun nextTriggerMillis(hour: Int, minute: Int, activeDays: Int): Long {
         val now = Calendar.getInstance()
         val trigger = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, hour)
@@ -64,6 +77,15 @@ object ReminderScheduler {
         }
         if (trigger.before(now)) {
             trigger.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        // AlarmManager has no day-of-week concept - without this, the alarm
+        // would fire every single day regardless of the habit's active days
+        // (e.g. a Mon-Fri habit would still buzz on Saturday and Sunday).
+        // Skip forward to the next day this habit is actually scheduled on.
+        var guard = 0
+        while (!isActiveOn(activeDays, trigger) && guard < 8) {
+            trigger.add(Calendar.DAY_OF_YEAR, 1)
+            guard++
         }
         return trigger.timeInMillis
     }

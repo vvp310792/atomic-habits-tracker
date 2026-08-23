@@ -48,12 +48,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
+import com.atomichabits.tracker.util.AppPreferences
 import com.atomichabits.tracker.util.declineDays
+import com.atomichabits.tracker.util.declineSeconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -65,6 +68,8 @@ private const val WAIT_SECONDS = 120
 @Composable
 fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null, initialAnchorId: String? = null) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val phaseSeconds = remember { AppPreferences.getBreathingPhaseSeconds(context) }
     val today = remember { LocalDate.now() }
     val todaysLogs by app.impulseRepository.observeForDate(today).collectAsState(initial = emptyList())
     val checks = todaysLogs.count { it.outcome == "CHECK" }
@@ -210,13 +215,13 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null, initialAnc
                     }
 
                     Text(
-                        if (canCheck) stringResource(R.string.impulse_breathing_hint)
-                        else stringResource(R.string.impulse_wait_hint),
+                        if (canCheck) breathingHintText(phaseSeconds, waiting = false)
+                        else breathingHintText(phaseSeconds, waiting = true),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                         textAlign = TextAlign.Center
                     )
-                    BreathingCircle(secondsLeft = secondsLeft, canCheck = canCheck)
+                    BreathingCircle(secondsLeft = secondsLeft, canCheck = canCheck, phaseSeconds = phaseSeconds)
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -349,14 +354,20 @@ fun ImpulseScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null, initialAnc
 }
 
 /**
- * Box/square breathing (4-4-4-4): inhale, hold, exhale, hold, each held for
- * [PHASE_SECONDS]. The circle grows during inhale, stays put during both holds,
- * shrinks during exhale - and the phase name is shown so the rhythm is legible,
- * not just a shrinking/growing shape.
+ * Box/square breathing (4-4-4-4 by default): inhale, hold, exhale, hold, each
+ * held for [phaseSeconds] (configurable in Settings, see AppPreferences). The
+ * circle grows during inhale, stays put during both holds, shrinks during
+ * exhale - and the phase name is shown so the rhythm is legible, not just a
+ * shrinking/growing shape.
  */
-private const val PHASE_SECONDS = 3
 private const val MIN_SCALE = 0.55f
 private const val MAX_SCALE = 1f
+
+/** Builds the "Квадратное дыхание..." hint text with the configured phase length. */
+private fun breathingHintText(phaseSeconds: Int, waiting: Boolean): String {
+    val base = "Квадратное дыхание: вдох — задержка — выдох — задержка, по $phaseSeconds ${declineSeconds(phaseSeconds)} каждая"
+    return if (waiting) "$base. Галочка станет доступна через 2 минуты" else base
+}
 
 private enum class BreathPhase(val label: String) {
     INHALE("Вдох"),
@@ -366,20 +377,20 @@ private enum class BreathPhase(val label: String) {
 }
 
 @Composable
-private fun BreathingCircle(secondsLeft: Int, canCheck: Boolean) {
+private fun BreathingCircle(secondsLeft: Int, canCheck: Boolean, phaseSeconds: Int) {
     val scale = remember { Animatable(MIN_SCALE) }
     var phase by remember { mutableStateOf(BreathPhase.INHALE) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(phaseSeconds) {
         while (true) {
             phase = BreathPhase.INHALE
-            scale.animateTo(MAX_SCALE, tween(PHASE_SECONDS * 1000, easing = LinearEasing))
+            scale.animateTo(MAX_SCALE, tween(phaseSeconds * 1000, easing = LinearEasing))
             phase = BreathPhase.HOLD_FULL
-            delay(PHASE_SECONDS * 1000L)
+            delay(phaseSeconds * 1000L)
             phase = BreathPhase.EXHALE
-            scale.animateTo(MIN_SCALE, tween(PHASE_SECONDS * 1000, easing = LinearEasing))
+            scale.animateTo(MIN_SCALE, tween(phaseSeconds * 1000, easing = LinearEasing))
             phase = BreathPhase.HOLD_EMPTY
-            delay(PHASE_SECONDS * 1000L)
+            delay(phaseSeconds * 1000L)
         }
     }
 

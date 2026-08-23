@@ -23,12 +23,20 @@ class ReminderReceiver : BroadcastReceiver() {
             try {
                 when (intent.action) {
                     ACTION_SHOW_REMINDER -> {
-                        val name = intent.getStringExtra(ReminderScheduler.EXTRA_HABIT_NAME) ?: ""
-                        NotificationHelper.showReminder(context, habitId, name)
-                        // Reschedule tomorrow's alarm for this habit.
-                        app.database.habitDao().getHabit(habitId)?.let { fresh ->
-                            ReminderScheduler.schedule(context, fresh)
+                        val fresh = app.database.habitDao().getHabit(habitId)
+                        // Belt-and-suspenders: ReminderScheduler already only schedules
+                        // for the habit's active days, but if activeDays changed after
+                        // this specific alarm was already queued (edit happened between
+                        // scheduling and firing), don't show a notification for a day
+                        // that's no longer scheduled - just quietly reschedule instead.
+                        val todayIsActive = fresh != null &&
+                            ReminderScheduler.isActiveOn(fresh.activeDays, java.util.Calendar.getInstance())
+                        if (fresh != null && todayIsActive) {
+                            val name = intent.getStringExtra(ReminderScheduler.EXTRA_HABIT_NAME) ?: ""
+                            NotificationHelper.showReminder(context, habitId, name)
                         }
+                        // Reschedule tomorrow's (or next active day's) alarm for this habit.
+                        fresh?.let { ReminderScheduler.schedule(context, it) }
                     }
                     ACTION_MARK_DONE -> {
                         app.repository.toggleCompletion(habitId, LocalDate.now())

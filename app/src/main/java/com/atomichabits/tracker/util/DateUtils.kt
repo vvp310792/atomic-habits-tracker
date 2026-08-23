@@ -35,3 +35,11 @@ fun declineDays(n: Int): String = when {
     n % 10 in 2..4 -> "дня"
     else -> "дней"
 }
+
+/** Correct Russian declension of "секунда/секунды/секунд" for a count. */
+fun declineSeconds(n: Int): String = when {
+    n % 100 in 11..14 -> "секунд"
+    n % 10 == 1 -> "секунда"
+    n % 10 in 2..4 -> "секунды"
+    else -> "секунд"
+}
