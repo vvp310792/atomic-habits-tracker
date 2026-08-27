@@ -3,6 +3,7 @@ package com.atomichabits.tracker.sync
 import android.content.Context
 import com.atomichabits.tracker.data.AppDatabase
 import com.atomichabits.tracker.data.Habit
+import com.atomichabits.tracker.data.HabitJournalEntry
 import com.atomichabits.tracker.data.HabitLog
 import com.atomichabits.tracker.data.Identity
 import com.atomichabits.tracker.data.ImpulseLog
