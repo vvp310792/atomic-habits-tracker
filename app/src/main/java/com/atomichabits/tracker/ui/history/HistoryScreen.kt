@@ -419,7 +419,7 @@ private fun ImpulseTrendChart(habits: List<Habit>, entries: List<HabitJournalEnt
             habits.forEach { h ->
                 val entry = entryByHabitDay[h.syncId to epochDay]
                 if (entry != null) {
-                    if (entry.amount.isBlank()) held++ else crossed++
+                    if (!entry.hadSlip) held++ else crossed++
                 }
             }
             epochDay to (held to crossed)
@@ -649,7 +649,7 @@ private fun AchievementsTab(
     journalEntries: List<HabitJournalEntry>,
     stats: HistoryStats
 ) {
-    val cleanDiaryDays = journalEntries.count { it.amount.isBlank() }
+    val cleanDiaryDays = journalEntries.count { !it.hadSlip }
     val libraryEntries = habits.count { !it.isTracked }
     val achievements = remember(stats, cleanDiaryDays, libraryEntries, habits) {
         listOf(

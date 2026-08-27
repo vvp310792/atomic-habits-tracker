@@ -245,6 +245,7 @@ private fun JournalContent(app: HabitTrackerApp, habit: Habit) {
                                         dateEpochDay = today.toEpochDay(),
                                         todaysEvents = form.todaysEvents,
                                         hadIncident = form.hadIncident,
+                                        hadSlip = form.hadSlip,
                                         amount = form.amount,
                                         whatIWanted = form.whatIWanted,
                                         substituteBehavior = form.substituteBehavior,
@@ -297,6 +298,7 @@ private fun StartCycleCard(onStart: () -> Unit) {
 private data class EntryFormState(
     val todaysEvents: String,
     val hadIncident: Boolean,
+    val hadSlip: Boolean,
     val amount: String,
     val whatIWanted: String,
     val substituteBehavior: String,
@@ -307,6 +309,7 @@ private data class EntryFormState(
 private fun TodayEntryForm(existing: HabitJournalEntry?, onSave: (EntryFormState) -> Unit) {
     var todaysEvents by remember(existing) { mutableStateOf(existing?.todaysEvents ?: "") }
     var hadIncident by remember(existing) { mutableStateOf(existing?.hadIncident ?: false) }
+    var hadSlip by remember(existing) { mutableStateOf(existing?.hadSlip ?: false) }
     var amount by remember(existing) { mutableStateOf(existing?.amount ?: "") }
     var whatIWanted by remember(existing) { mutableStateOf(existing?.whatIWanted ?: "") }
     var substituteBehavior by remember(existing) { mutableStateOf(existing?.substituteBehavior ?: "") }
@@ -329,13 +332,29 @@ private fun TodayEntryForm(existing: HabitJournalEntry?, onSave: (EntryFormState
                 Text(stringResource(R.string.journal_field_had_incident), style = MaterialTheme.typography.bodyMedium)
             }
 
-            OutlinedTextField(
-                value = amount,
-                onValueChange = { amount = it },
-                label = { Text(stringResource(R.string.journal_field_amount)) },
-                placeholder = { Text(stringResource(R.string.journal_field_amount_hint)) },
-                modifier = Modifier.fillMaxWidth()
-            )
+            // The explicit source of truth for "days without" - not whether
+            // Amount happens to be blank, which broke the moment someone
+            // honestly typed "0" there (see HabitJournalEntry.kt).
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = hadSlip,
+                    onCheckedChange = {
+                        hadSlip = it
+                        if (!it) amount = ""
+                    }
+                )
+                Text(stringResource(R.string.journal_field_had_slip), style = MaterialTheme.typography.bodyMedium)
+            }
+
+            if (hadSlip) {
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    label = { Text(stringResource(R.string.journal_field_amount)) },
+                    placeholder = { Text(stringResource(R.string.journal_field_amount_hint)) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             OutlinedTextField(
                 value = whatIWanted,
@@ -365,7 +384,8 @@ private fun TodayEntryForm(existing: HabitJournalEntry?, onSave: (EntryFormState
                         EntryFormState(
                             todaysEvents = todaysEvents.trim(),
                             hadIncident = hadIncident,
-                            amount = amount.trim(),
+                            hadSlip = hadSlip,
+                            amount = if (hadSlip) amount.trim() else "",
                             whatIWanted = whatIWanted.trim(),
                             substituteBehavior = substituteBehavior.trim(),
                             substituteSucceeded = substituteSucceeded
@@ -389,13 +409,15 @@ private fun JournalEntryHistoryCard(entry: HabitJournalEntry) {
                 Text(entry.todaysEvents, style = MaterialTheme.typography.bodyMedium)
             }
             Text(
-                if (entry.amount.isBlank()) {
+                if (!entry.hadSlip) {
                     stringResource(R.string.journal_history_clean)
-                } else {
+                } else if (entry.amount.isNotBlank()) {
                     stringResource(R.string.journal_history_amount, entry.amount)
+                } else {
+                    stringResource(R.string.journal_history_slip)
                 },
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (entry.amount.isBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                color = if (!entry.hadSlip) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
             )
             if (entry.whatIWanted.isNotBlank()) {
                 Text(
@@ -417,8 +439,8 @@ private fun JournalEntryHistoryCard(entry: HabitJournalEntry) {
 
 @Composable
 private fun CycleSummaryCard(entries: List<HabitJournalEntry>, onRestart: () -> Unit) {
-    val cleanDays = entries.count { it.amount.isBlank() }
-    val slipDays = entries.count { it.amount.isNotBlank() }
+    val cleanDays = entries.count { !it.hadSlip }
+    val slipDays = entries.count { it.hadSlip }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(

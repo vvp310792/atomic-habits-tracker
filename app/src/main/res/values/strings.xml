@@ -49,6 +49,7 @@
     <string name="journal_field_events">Сегодняшние события</string>
     <string name="journal_field_events_hint">Что происходило сегодня?</string>
     <string name="journal_field_had_incident">Связано с этой привычкой</string>
+    <string name="journal_field_had_slip">Был срыв</string>
     <string name="journal_field_amount">Объём нежелательной привычки</string>
     <string name="journal_field_amount_hint">Например: 5 банок, или оставь пустым — 0</string>
     <string name="journal_field_wanted">Чего я хотел(а) на самом деле</string>
@@ -60,6 +61,7 @@
     <string name="journal_history_title">История цикла</string>
     <string name="journal_history_clean">Чисто</string>
     <string name="journal_history_amount">Объём: %1$s</string>
+    <string name="journal_history_slip">Был срыв</string>
     <string name="journal_history_wanted">Хотел(а): %1$s</string>
     <string name="journal_cycle_done_title">Цикл завершён — 30 дней</string>
     <string name="journal_cycle_done_summary">Чистых дней: %1$d · Дней со срывом: %2$d</string>

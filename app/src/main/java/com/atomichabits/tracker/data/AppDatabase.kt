@@ -10,7 +10,7 @@ import java.util.UUID
 
 @Database(
     entities = [Habit::class, HabitLog::class, ImpulseLog::class, Identity::class, HabitJournalEntry::class],
-    version = 17,
+    version = 18,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -297,6 +297,24 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v17 -> v18: adds HabitJournalEntry.hadSlip as the explicit source of
+         * truth for "did a slip happen today", replacing the earlier inference
+         * from a blank Amount field - which broke as soon as someone typed "0"
+         * into Amount as its own hint text suggested, since "0" is a non-blank
+         * string and every filled-in day was silently counted as a slip.
+         */
+        private val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE habit_journal_entries ADD COLUMN hadSlip INTEGER NOT NULL DEFAULT 0")
+                // Best-effort backfill for entries already saved under the old
+                // inference, so existing history isn't silently reinterpreted as
+                // "all clean" - anything with a non-blank amount is treated as
+                // having been a slip, matching what the app actually did before.
+                db.execSQL("UPDATE habit_journal_entries SET hadSlip = 1 WHERE amount != ''")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -307,7 +325,8 @@ abstract class AppDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
                         MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-                        MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17
+                        MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
+                        MIGRATION_17_18
                     )
                     .build()
                 INSTANCE = instance

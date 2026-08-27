@@ -29,12 +29,14 @@ class HabitJournalRepository(
 
 /**
  * "Days without" for the new diary model: a day counts as clean only when it
- * has an EXPLICIT entry with a blank [HabitJournalEntry.amount] - "0 in the
- * amount = a day without" - not merely the absence of any entry at all. Days
- * with no entry are skipped (neither extend nor break the count), same
- * live-and-let-live treatment as non-scheduled days get elsewhere in this app,
- * since missing a diary entry isn't the same claim as an explicit "nothing
- * happened today".
+ * has an EXPLICIT entry with [HabitJournalEntry.hadSlip] false - the checkbox
+ * is the sole source of truth, not whether [HabitJournalEntry.amount] happens
+ * to be blank (typing "0" into Amount is a non-blank string, so inferring
+ * from blankness silently miscounted every honestly-filled-in day as a slip -
+ * see the class doc). Days with no entry are skipped (neither extend nor
+ * break the count), same live-and-let-live treatment as non-scheduled days
+ * get elsewhere in this app, since missing a diary entry isn't the same claim
+ * as an explicit "nothing happened today".
  */
 fun computeJournalDaysWithout(
     habitSyncId: String,
@@ -43,7 +45,7 @@ fun computeJournalDaysWithout(
 ): DaysWithoutInfo {
     val today = LocalDate.now().toEpochDay()
     val relevant = entries.filter { it.habitSyncId == habitSyncId }
-    val slipDays = relevant.filter { it.amount.isNotBlank() }.map { it.dateEpochDay }.distinct().sorted()
+    val slipDays = relevant.filter { it.hadSlip }.map { it.dateEpochDay }.distinct().sorted()
     val start = if (habitCreatedAtEpochDay > 0) habitCreatedAtEpochDay else (relevant.minOfOrNull { it.dateEpochDay } ?: today)
 
     if (slipDays.isEmpty()) {

@@ -18,12 +18,13 @@ import androidx.room.PrimaryKey
  * happened at all (the book's "○" checkbox).
  * [amount] - "Объём нежелательной привычки": free text on purpose (e.g. "5
  * банок", "не было") since the real quantity unit differs per habit and isn't
- * always numeric - but a BLANK amount is the explicit signal for a clean day
- * (see ImpulseRepository-equivalent computeJournalDaysWithout): "0 in the
- * amount = a day without", not silence/absence of a row, which is a
- * deliberately stricter standard than the old "no CROSS logged" model, since
- * this method asks for an honest entry every day, not just when something
- * goes wrong.
+ * always numeric - descriptive detail only, filled in when [hadSlip] is true.
+ * [hadSlip] is the explicit source of truth for whether today counts as a
+ * slip - NOT whether [amount] happens to be blank. Early on this was inferred
+ * from a blank amount, but that broke the moment someone honestly typed "0"
+ * into the amount field as instructed by its own hint text: "0" is a
+ * non-blank string, so every single filled-in day was silently counted as a
+ * slip. An explicit checkbox has no such ambiguity.
  * [whatIWanted] - "Чего я хотел(а) на самом деле": re-examined fresh every
  * single day (not set once at habit creation like whyItMatters/alternativeSuggestion) -
  * the whole point of the method is that this answer changes as understanding deepens.
@@ -48,6 +49,7 @@ data class HabitJournalEntry(
     val dateEpochDay: Long = 0,
     val todaysEvents: String = "",
     val hadIncident: Boolean = false,
+    val hadSlip: Boolean = false,
     val amount: String = "",
     val whatIWanted: String = "",
     val substituteBehavior: String = "",

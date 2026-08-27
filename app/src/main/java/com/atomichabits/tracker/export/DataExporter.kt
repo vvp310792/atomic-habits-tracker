@@ -144,7 +144,8 @@ object DataExporter {
                         put("date", LocalDate.ofEpochDay(entry.dateEpochDay).toString())
                         if (entry.todaysEvents.isNotBlank()) put("todaysEvents", entry.todaysEvents)
                         put("hadIncident", entry.hadIncident)
-                        put("amount", entry.amount)
+                        put("hadSlip", entry.hadSlip)
+                        if (entry.hadSlip && entry.amount.isNotBlank()) put("amount", entry.amount)
                         if (entry.whatIWanted.isNotBlank()) put("whatIWanted", entry.whatIWanted)
                         if (entry.substituteBehavior.isNotBlank()) {
                             put("substituteBehavior", entry.substituteBehavior)
