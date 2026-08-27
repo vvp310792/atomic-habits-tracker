@@ -23,7 +23,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,8 +56,6 @@ import com.atomichabits.tracker.export.DataExporter
 import com.atomichabits.tracker.update.ApkInstaller
 import com.atomichabits.tracker.update.UpdateCheckResult
 import com.atomichabits.tracker.update.UpdateChecker
-import com.atomichabits.tracker.util.AppPreferences
-import com.atomichabits.tracker.util.declineSeconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -327,7 +324,8 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null, onOpenSco
                                         habitDao = app.database.habitDao(),
                                         habitLogDao = app.database.habitLogDao(),
                                         identityDao = app.database.identityDao(),
-                                        impulseLogDao = app.database.impulseLogDao()
+                                        impulseLogDao = app.database.impulseLogDao(),
+                                        journalDao = app.database.habitJournalEntryDao()
                                     )
                                 }
                                 context.startActivity(DataExporter.shareIntent(context, file))
@@ -350,28 +348,6 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null, onOpenSco
                 }
                 exportError?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-                }
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(stringResource(R.string.settings_breathing_section), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    stringResource(R.string.settings_breathing_hint),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-                var breathingPhaseSeconds by remember { mutableStateOf(AppPreferences.getBreathingPhaseSeconds(context)) }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AppPreferences.BREATHING_PHASE_OPTIONS.forEach { seconds ->
-                        FilterChip(
-                            selected = breathingPhaseSeconds == seconds,
-                            onClick = {
-                                breathingPhaseSeconds = seconds
-                                AppPreferences.setBreathingPhaseSeconds(context, seconds)
-                            },
-                            label = { Text("$seconds ${declineSeconds(seconds)}") }
-                        )
-                    }
                 }
             }
 

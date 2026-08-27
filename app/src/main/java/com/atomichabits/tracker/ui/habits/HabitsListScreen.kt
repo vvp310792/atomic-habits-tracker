@@ -40,6 +40,7 @@ import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.DaysWithoutInfo
 import com.atomichabits.tracker.data.Habit
 import com.atomichabits.tracker.data.MasteryInfo
+import com.atomichabits.tracker.data.computeJournalDaysWithout
 import com.atomichabits.tracker.ui.components.CategoryTag
 import com.atomichabits.tracker.ui.components.CrossGroupDraggableSections
 import com.atomichabits.tracker.ui.components.DragGroup
@@ -56,21 +57,12 @@ fun HabitsListScreen(
     onAddHabit: (initialQualityType: String, initialTracked: Boolean) -> Unit
 ) {
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
-    val impulseLogs by app.impulseRepository.observeAll().collectAsState(initial = emptyList())
+    val journalEntries by app.journalRepository.observeAll().collectAsState(initial = emptyList())
     val allLogs by app.repository.observeAllLogs().collectAsState(initial = emptyList())
 
     val greenHabits = habits.filter { it.qualityType == "USEFUL" }
     val yellowHabits = habits.filter { it.qualityType == "NEUTRAL" || it.qualityType == "DESIRED" }
     val redHabits = habits.filter { it.qualityType == "HARMFUL" }
-
-    val impulseScoreByHabit = remember(impulseLogs) {
-        impulseLogs
-            .filter { it.linkedHarmfulAnchorId.isNotBlank() }
-            .groupBy { it.linkedHarmfulAnchorId }
-            .mapValues { (_, logs) ->
-                logs.count { it.outcome == "CHECK" } to logs.count { it.outcome == "CROSS" }
-            }
-    }
 
     // Habit-formation mastery progress per habit: either computed from log
     // history (HabitRepository.computeMastery, tracked habits only) or a flat
@@ -94,16 +86,13 @@ fun HabitsListScreen(
         }.toMap()
     }
 
-    // "Days without" for HARMFUL habits (Anna Lembke's dopamine-balance framing -
-    // see ImpulseRepository.computeDaysWithout). Only meaningful for the red
-    // section, so only computed for those.
-    val daysWithoutByHabit = remember(redHabits, impulseLogs) {
-        // Only tracked habits get a "days without" count - an untracked one is a
-        // library reference, not something actively being resisted, so the metric
-        // isn't meaningful for it (see ImpulseScreen, which already excludes
-        // untracked HARMFUL habits from the urge picker for the same reason).
+    // "Days without" for HARMFUL habits (Anna Lembke's dopamine-balance framing,
+    // now computed from the daily diary - see data/HabitJournalRepository.kt).
+    // Only tracked habits get a count - an untracked one is a library reference,
+    // not something actively being worked on in the diary.
+    val daysWithoutByHabit = remember(redHabits, journalEntries) {
         redHabits.filter { it.isTracked }
-            .associate { h -> h.syncId to app.impulseRepository.computeDaysWithout(h, impulseLogs) }
+            .associate { h -> h.syncId to computeJournalDaysWithout(h.syncId, h.createdAtEpochDay, journalEntries) }
     }
 
     fun rowClick(habit: Habit) {
@@ -124,7 +113,6 @@ fun HabitsListScreen(
                     title = stringResource(R.string.habits_section_green),
                     tint = Color(0xFF3DBE8B),
                     habits = greenHabits,
-                    impulseScoreByHabit = impulseScoreByHabit,
                     masteryByHabit = masteryByHabit,
                     onAdd = { onAddHabit("USEFUL", true) },
                     onMove = { habit, toTime -> app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
@@ -138,7 +126,6 @@ fun HabitsListScreen(
                     title = stringResource(R.string.habits_section_yellow),
                     tint = Color(0xFFF2A93B),
                     habits = yellowHabits,
-                    impulseScoreByHabit = impulseScoreByHabit,
                     masteryByHabit = masteryByHabit,
                     onAdd = { onAddHabit("DESIRED", false) },
                     onMove = { habit, toTime -> app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
@@ -152,7 +139,6 @@ fun HabitsListScreen(
                     title = stringResource(R.string.habits_section_red),
                     tint = Color(0xFFEF6461),
                     habits = redHabits,
-                    impulseScoreByHabit = impulseScoreByHabit,
                     masteryByHabit = masteryByHabit,
                     daysWithoutByHabit = daysWithoutByHabit,
                     onAdd = { onAddHabit("HARMFUL", false) },
@@ -219,7 +205,6 @@ private fun ColoredQualitySection(
     title: String,
     tint: Color,
     habits: List<Habit>,
-    impulseScoreByHabit: Map<String, Pair<Int, Int>>,
     masteryByHabit: Map<String, MasteryInfo>,
     daysWithoutByHabit: Map<String, DaysWithoutInfo> = emptyMap(),
     onAdd: () -> Unit,
@@ -266,7 +251,7 @@ private fun ColoredQualitySection(
                     onReorder = { _, orderedChains -> onReorder(orderedChains.flatMap { it.habits }) },
                     emptyGroupHint = stringResource(R.string.home_group_empty_hint)
                 ) { chain, isDragging ->
-                    HabitChainBlock(chain, impulseScoreByHabit, masteryByHabit, daysWithoutByHabit, isDragging, onClick)
+                    HabitChainBlock(chain, masteryByHabit, daysWithoutByHabit, isDragging, onClick)
                 }
             }
         }
@@ -282,7 +267,6 @@ private fun ColoredQualitySection(
 @Composable
 private fun HabitChainBlock(
     chain: HabitChain,
-    impulseScoreByHabit: Map<String, Pair<Int, Int>>,
     masteryByHabit: Map<String, MasteryInfo>,
     daysWithoutByHabit: Map<String, DaysWithoutInfo>,
     isDragging: Boolean,
@@ -291,7 +275,7 @@ private fun HabitChainBlock(
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         chain.habits.forEachIndexed { index, habit ->
             if (index == 0) {
-                UniversalHabitRow(habit, impulseScoreByHabit[habit.syncId], masteryByHabit[habit.syncId], daysWithoutByHabit[habit.syncId]) { onClick(habit) }
+                UniversalHabitRow(habit, masteryByHabit[habit.syncId], daysWithoutByHabit[habit.syncId]) { onClick(habit) }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Spacer(Modifier.size(20.dp))
@@ -302,7 +286,7 @@ private fun HabitChainBlock(
                         modifier = Modifier.padding(end = 4.dp)
                     )
                     Box(modifier = Modifier.weight(1f)) {
-                        UniversalHabitRow(habit, impulseScoreByHabit[habit.syncId], masteryByHabit[habit.syncId], daysWithoutByHabit[habit.syncId]) { onClick(habit) }
+                        UniversalHabitRow(habit, masteryByHabit[habit.syncId], daysWithoutByHabit[habit.syncId]) { onClick(habit) }
                     }
                 }
             }
@@ -311,7 +295,7 @@ private fun HabitChainBlock(
 }
 
 @Composable
-private fun UniversalHabitRow(habit: Habit, impulseScore: Pair<Int, Int>?, mastery: MasteryInfo?, daysWithout: DaysWithoutInfo?, onClick: () -> Unit) {
+private fun UniversalHabitRow(habit: Habit, mastery: MasteryInfo?, daysWithout: DaysWithoutInfo?, onClick: () -> Unit) {
     val accent = remember(habit.colorHex) {
         runCatching { Color(android.graphics.Color.parseColor(habit.colorHex)) }
             .getOrDefault(Color(0xFF7C6CF0))
@@ -382,13 +366,6 @@ private fun UniversalHabitRow(habit: Habit, impulseScore: Pair<Int, Int>?, maste
                         "\uD83C\uDFAF " + habit.whyItMatters,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-                }
-                if (impulseScore != null) {
-                    Text(
-                        "\u26A1 ${impulseScore.first}:${impulseScore.second}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
                 if (daysWithout != null && daysWithout.currentDays > 0) {

@@ -38,21 +38,36 @@
     <string name="history_impulse_chart_no_habits">Нет отслеживаемых вредных привычек</string>
     <string name="history_impulse_legend_check">Удержался</string>
     <string name="history_impulse_legend_cross">Поддался</string>
+
+    <string name="journal_title">Дневник</string>
+    <string name="journal_no_habits">Нет отслеживаемых вредных привычек — добавь или включи отслеживание в «Привычках»</string>
+    <string name="journal_cycle_progress">День %1$d из %2$d</string>
+    <string name="journal_start_title">Начать 30-дневный дневник</string>
+    <string name="journal_start_hint">Каждый день — короткая запись: что случилось, сколько было, чего ты хотел(а) на самом деле, и что попробовал(а) вместо этого. Метод из книги Мисудзу Накасимы — не запрет, а постепенная замена.</string>
+    <string name="journal_start_button">Начать</string>
+    <string name="journal_today_title">Сегодня</string>
+    <string name="journal_field_events">Сегодняшние события</string>
+    <string name="journal_field_events_hint">Что происходило сегодня?</string>
+    <string name="journal_field_had_incident">Связано с этой привычкой</string>
+    <string name="journal_field_amount">Объём нежелательной привычки</string>
+    <string name="journal_field_amount_hint">Например: 5 банок, или оставь пустым — 0</string>
+    <string name="journal_field_wanted">Чего я хотел(а) на самом деле</string>
+    <string name="journal_field_wanted_hint">Что стояло за этим желанием?</string>
+    <string name="journal_field_substitute">Замещающее поведение</string>
+    <string name="journal_field_substitute_hint">Что попробовал(а) сделать вместо?</string>
+    <string name="journal_field_substitute_succeeded">Удалось</string>
+    <string name="journal_update_button">Обновить запись</string>
+    <string name="journal_history_title">История цикла</string>
+    <string name="journal_history_clean">Чисто</string>
+    <string name="journal_history_amount">Объём: %1$s</string>
+    <string name="journal_history_wanted">Хотел(а): %1$s</string>
+    <string name="journal_cycle_done_title">Цикл завершён — 30 дней</string>
+    <string name="journal_cycle_done_summary">Чистых дней: %1$d · Дней со срывом: %2$d</string>
+    <string name="journal_restart_button">Начать новый цикл</string>
     <string name="history_avg_completion">Сред. доля завершённых</string>
     <string name="history_habit_total">Всего выполнено: %1$d</string>
 
     <!-- Impulse (urge intercept) -->
-    <string name="impulse_title">Позыв</string>
-    <string name="impulse_score">Сегодня: %1$d:%2$d</string>
-    <string name="impulse_link_hint">К какой привычке это относится? (необязательно)</string>
-    <string name="impulse_link_hint_required">Выберите тег — хотя бы «Без привязки», чтобы продолжить</string>
-    <string name="impulse_no_link">Без привязки</string>
-    <string name="impulse_check">Удержался</string>
-    <string name="impulse_cross">Поддался</string>
-    <string name="impulse_logged">Записано!</string>
-    <string name="impulse_again">Ещё один позыв</string>
-    <string name="impulse_reflection_title">Что это было?</string>
-    <string name="impulse_note_label">Свободное поле (необязательно)</string>
     <string name="streak_days">%1$d дн. подряд</string>
 
     <!-- Add / Edit habit -->
@@ -185,8 +200,6 @@
     <string name="settings_export_button">Экспортировать и поделиться</string>
     <string name="settings_export_in_progress">Готовим файл…</string>
     <string name="settings_export_error">Не удалось создать файл экспорта</string>
-    <string name="settings_breathing_section">Квадратное дыхание</string>
-    <string name="settings_breathing_hint">Длительность каждой фазы (вдох / задержка / выдох / задержка) на экране «Позыв»</string>
     <string name="settings_updates_section">Обновления</string>
     <string name="settings_updates_current">Установлена версия %1$s (build %2$d)</string>
     <string name="settings_updates_check">Проверить обновления</string>

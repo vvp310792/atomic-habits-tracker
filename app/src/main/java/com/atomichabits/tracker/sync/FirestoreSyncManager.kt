@@ -36,12 +36,14 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
     private var logsListener: ListenerRegistration? = null
     private var impulsesListener: ListenerRegistration? = null
     private var identitiesListener: ListenerRegistration? = null
+    private var journalListener: ListenerRegistration? = null
     private val scope = CoroutineScope(Dispatchers.IO)
 
     private fun habitsRef(uid: String) = db.collection("users").document(uid).collection("habits")
     private fun logsRef(uid: String) = db.collection("users").document(uid).collection("logs")
     private fun impulsesRef(uid: String) = db.collection("users").document(uid).collection("impulses")
     private fun identitiesRef(uid: String) = db.collection("users").document(uid).collection("identities")
+    private fun journalRef(uid: String) = db.collection("users").document(uid).collection("journal")
 
     /** Attaches realtime listeners for [uid]'s data. Call on sign-in. Safe to call again to re-attach. */
     fun start(uid: String) {
@@ -62,6 +64,10 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
             val changes = snapshot?.documentChanges ?: return@addSnapshotListener
             scope.launch { mergeIdentityChanges(changes) }
         }
+        journalListener = journalRef(uid).addSnapshotListener { snapshot, _ ->
+            val changes = snapshot?.documentChanges ?: return@addSnapshotListener
+            scope.launch { mergeJournalChanges(changes) }
+        }
     }
 
     /** Detaches listeners. Call on sign-out. */
@@ -70,10 +76,12 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
         logsListener?.remove()
         impulsesListener?.remove()
         identitiesListener?.remove()
+        journalListener?.remove()
         habitsListener = null
         logsListener = null
         impulsesListener = null
         identitiesListener = null
+        journalListener = null
     }
 
     fun pushHabit(uid: String, habit: Habit) {
@@ -108,6 +116,7 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
             "temptationBundle" to habit.temptationBundle,
             "manuallyMastered" to habit.manuallyMastered,
             "selfBindingAction" to habit.selfBindingAction,
+            "journalCycleStartEpochDay" to habit.journalCycleStartEpochDay,
             "updatedAt" to FieldValue.serverTimestamp()
         )
         habitsRef(uid).document(habit.syncId).set(data, SetOptions.merge())
@@ -154,6 +163,22 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
         impulsesRef(uid).document(log.syncId).set(data, SetOptions.merge())
     }
 
+    fun pushJournalEntry(uid: String, entry: HabitJournalEntry) {
+        if (entry.syncId.isBlank()) return
+        val data = mapOf(
+            "habitSyncId" to entry.habitSyncId,
+            "dateEpochDay" to entry.dateEpochDay,
+            "todaysEvents" to entry.todaysEvents,
+            "hadIncident" to entry.hadIncident,
+            "amount" to entry.amount,
+            "whatIWanted" to entry.whatIWanted,
+            "substituteBehavior" to entry.substituteBehavior,
+            "substituteSucceeded" to entry.substituteSucceeded,
+            "cycleStartEpochDay" to entry.cycleStartEpochDay
+        )
+        journalRef(uid).document(entry.syncId).set(data, SetOptions.merge())
+    }
+
     private fun logDocId(habitSyncId: String, dateEpochDay: Long) = "${habitSyncId}_$dateEpochDay"
 
     /** Pushes everything currently local - used right after first sign-in, and as a manual "sync now". */
@@ -167,6 +192,7 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
         }
         database.impulseLogDao().getAllOnce().forEach { log -> pushImpulseLog(uid, log) }
         database.identityDao().getAllOnce().forEach { identity -> pushIdentity(uid, identity) }
+        database.habitJournalEntryDao().getAllOnce().forEach { entry -> pushJournalEntry(uid, entry) }
     }
 
     private suspend fun mergeHabitChanges(changes: List<DocumentChange>) {
@@ -213,7 +239,8 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
                 difficultyBumpedAtEpochDay = doc.getLong("difficultyBumpedAtEpochDay") ?: 0L,
                 temptationBundle = doc.getString("temptationBundle") ?: "",
                 manuallyMastered = doc.getBoolean("manuallyMastered") ?: false,
-                selfBindingAction = doc.getString("selfBindingAction") ?: ""
+                selfBindingAction = doc.getString("selfBindingAction") ?: "",
+                journalCycleStartEpochDay = doc.getLong("journalCycleStartEpochDay") ?: 0L
             )
             val newLocalId = habitDao.upsert(habit)
             val localId = existing?.id ?: newLocalId
@@ -292,6 +319,35 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
                     statement = statement,
                     createdAtEpochDay = doc.getLong("createdAtEpochDay") ?: LocalDate.now().toEpochDay(),
                     archived = doc.getBoolean("archived") ?: false
+                )
+            )
+        }
+    }
+
+    private suspend fun mergeJournalChanges(changes: List<DocumentChange>) {
+        val habitDao = database.habitDao()
+        val journalDao = database.habitJournalEntryDao()
+        changes.forEach { change ->
+            if (change.type == DocumentChange.Type.REMOVED) return@forEach
+            val doc = change.document
+            val syncId = doc.id
+            val habitSyncId = doc.getString("habitSyncId") ?: return@forEach
+            val localHabit = habitDao.getBySyncId(habitSyncId) ?: return@forEach
+            val existing = journalDao.getBySyncId(syncId)
+            journalDao.upsert(
+                HabitJournalEntry(
+                    id = existing?.id ?: 0,
+                    syncId = syncId,
+                    habitId = localHabit.id,
+                    habitSyncId = habitSyncId,
+                    dateEpochDay = doc.getLong("dateEpochDay") ?: LocalDate.now().toEpochDay(),
+                    todaysEvents = doc.getString("todaysEvents") ?: "",
+                    hadIncident = doc.getBoolean("hadIncident") ?: false,
+                    amount = doc.getString("amount") ?: "",
+                    whatIWanted = doc.getString("whatIWanted") ?: "",
+                    substituteBehavior = doc.getString("substituteBehavior") ?: "",
+                    substituteSucceeded = doc.getBoolean("substituteSucceeded") ?: false,
+                    cycleStartEpochDay = doc.getLong("cycleStartEpochDay") ?: 0L
                 )
             )
         }

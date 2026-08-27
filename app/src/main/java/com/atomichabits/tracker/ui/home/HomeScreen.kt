@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.Habit
-import com.atomichabits.tracker.data.computeDaysWithout
+import com.atomichabits.tracker.data.computeJournalDaysWithout
 import com.atomichabits.tracker.ui.components.CrossGroupDraggableSections
 import com.atomichabits.tracker.ui.components.DateProgressRing
 import com.atomichabits.tracker.ui.components.DragGroup
@@ -62,7 +62,7 @@ fun HomeScreen(
     app: HabitTrackerApp,
     onAddHabit: () -> Unit,
     onOpenHabit: (Long) -> Unit,
-    onOpenImpulse: (String) -> Unit
+    onOpenJournal: (Long) -> Unit
 ) {
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
     // "Сделал" (green) is for habits you're actively building (USEFUL/NEUTRAL/
@@ -70,7 +70,7 @@ fun HomeScreen(
     // since checking off "did the bad thing" isn't a meaningful daily checkbox.
     val trackedHabits = remember(habits) { habits.filter { it.isTracked && it.qualityType != "HARMFUL" } }
     val trackedHarmful = remember(habits) { habits.filter { it.isTracked && it.qualityType == "HARMFUL" } }
-    val impulseLogs by app.impulseRepository.observeAll().collectAsState(initial = emptyList())
+    val journalEntries by app.journalRepository.observeAll().collectAsState(initial = emptyList())
     val today = remember { LocalDate.now() }
     // Full current week Monday..Sunday, so "today" sits wherever its weekday
     // falls rather than always being the last/rightmost item.
@@ -255,14 +255,14 @@ fun HomeScreen(
                     )
                 }
                 items(trackedHarmful, key = { "held_${it.id}" }) { habit ->
-                    val daysWithout = remember(habit, impulseLogs) {
-                        computeDaysWithout(habit.syncId, habit.createdAtEpochDay, impulseLogs)
+                    val daysWithout = remember(habit, journalEntries) {
+                        computeJournalDaysWithout(habit.syncId, habit.createdAtEpochDay, journalEntries)
                     }
-                    val hadSlipToday = remember(habit, impulseLogs, today) {
-                        impulseLogs.any {
-                            it.linkedHarmfulAnchorId == habit.syncId &&
-                                it.outcome == "CROSS" &&
-                                it.dateEpochDay == today.toEpochDay()
+                    val hadSlipToday = remember(habit, journalEntries, today) {
+                        journalEntries.any {
+                            it.habitSyncId == habit.syncId &&
+                                it.dateEpochDay == today.toEpochDay() &&
+                                it.amount.isNotBlank()
                         }
                     }
                     Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
@@ -270,7 +270,7 @@ fun HomeScreen(
                             habit = habit,
                             hadSlipToday = hadSlipToday,
                             daysWithout = daysWithout.currentDays,
-                            onClick = { onOpenImpulse(habit.syncId) }
+                            onClick = { onOpenJournal(habit.id) }
                         )
                     }
                 }

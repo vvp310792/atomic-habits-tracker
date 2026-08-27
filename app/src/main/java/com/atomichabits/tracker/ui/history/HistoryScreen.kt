@@ -59,8 +59,8 @@ import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.Habit
+import com.atomichabits.tracker.data.HabitJournalEntry
 import com.atomichabits.tracker.data.HabitLog
-import com.atomichabits.tracker.data.ImpulseLog
 import com.atomichabits.tracker.util.isHabitScheduledOn
 import java.time.LocalDate
 import java.time.YearMonth
@@ -73,7 +73,7 @@ fun HistoryScreen(app: HabitTrackerApp, onOpenHabit: (Long) -> Unit) {
     val trackedHabits = remember(habits) { habits.filter { it.isTracked } }
     val trackedHarmfulHabits = remember(habits) { habits.filter { it.isTracked && it.qualityType == "HARMFUL" } }
     val allLogs by app.repository.observeAllLogs().collectAsState(initial = emptyList())
-    val impulseLogs by app.impulseRepository.observeAll().collectAsState(initial = emptyList())
+    val journalEntries by app.journalRepository.observeAll().collectAsState(initial = emptyList())
     val today = remember { LocalDate.now() }
 
     var tabIndex by remember { mutableIntStateOf(0) }
@@ -98,7 +98,7 @@ fun HistoryScreen(app: HabitTrackerApp, onOpenHabit: (Long) -> Unit) {
                 0 -> CalendarTab(
                     habits = trackedHabits,
                     allLogs = allLogs,
-                    impulseLogs = impulseLogs,
+                    journalEntries = journalEntries,
                     harmfulHabits = trackedHarmfulHabits,
                     stats = stats,
                     today = today,
@@ -106,7 +106,7 @@ fun HistoryScreen(app: HabitTrackerApp, onOpenHabit: (Long) -> Unit) {
                     onMonthChange = { visibleMonth = it }
                 )
                 1 -> HabitsStatsTab(trackedHabits, allLogs)
-                else -> AchievementsTab(habits, impulseLogs, stats)
+                else -> AchievementsTab(habits, journalEntries, stats)
             }
         }
     }
@@ -211,7 +211,7 @@ private fun computeHistoryStats(habits: List<Habit>, allLogs: List<HabitLog>, to
 private fun CalendarTab(
     habits: List<Habit>,
     allLogs: List<HabitLog>,
-    impulseLogs: List<ImpulseLog>,
+    journalEntries: List<HabitJournalEntry>,
     harmfulHabits: List<Habit>,
     stats: HistoryStats,
     today: LocalDate,
@@ -267,7 +267,7 @@ private fun CalendarTab(
         }
 
         item {
-            ImpulseTrendChart(habits = harmfulHabits, logs = impulseLogs, today = today)
+            ImpulseTrendChart(habits = harmfulHabits, entries = journalEntries, today = today)
             Spacer(Modifier.size(20.dp))
         }
 
@@ -391,42 +391,35 @@ private fun MonthCalendar(
 // region ---- Impulse ("Позыв") trend chart ----
 
 /**
- * Stacked daily bar chart of the last [days] days of "Позыв" activity, counted
- * per (tracked HARMFUL habit, day) rather than per logged event: a CLOSED
- * (already-finished) day with no logged CROSS counts as held even with zero
- * explicit check-ins that day - staying quiet about an urge that never got
- * logged is still a real day without a slip, same logic as
- * [com.atomichabits.tracker.data.computeDaysWithout]'s "days without". TODAY is treated differently: it's still open, so it only
- * counts as held once an explicit CHECK is logged - crediting it in advance
- * would be crediting a verdict the day hasn't actually reached yet.
+ * Stacked daily bar chart of the last [days] days of diary activity, counted
+ * per (tracked HARMFUL habit, day): a day counts as held only when there's an
+ * explicit journal entry for it with a blank amount - "0 in the amount = a
+ * day without" - and as a slip when the entry has a non-blank amount. A day
+ * with no entry at all is neutral (shown as a small baseline mark, not
+ * counted either way) since a missing diary entry isn't the same claim as an
+ * explicit "nothing happened today" - same standard as
+ * [com.atomichabits.tracker.data.computeJournalDaysWithout].
  */
 @Composable
-private fun ImpulseTrendChart(habits: List<Habit>, logs: List<ImpulseLog>, today: LocalDate, days: Int = 30) {
+private fun ImpulseTrendChart(habits: List<Habit>, entries: List<HabitJournalEntry>, today: LocalDate, days: Int = 30) {
     val checkColor = MaterialTheme.colorScheme.primary
     val crossColor = MaterialTheme.colorScheme.error
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
 
     val since = today.minusDays((days - 1).toLong())
 
-    val crossByHabitDay = remember(logs) {
-        logs.filter { it.outcome == "CROSS" }.map { it.linkedHarmfulAnchorId to it.dateEpochDay }.toSet()
+    val entryByHabitDay = remember(entries) {
+        entries.associateBy { it.habitSyncId to it.dateEpochDay }
     }
-    val checkByHabitDay = remember(logs) {
-        logs.filter { it.outcome == "CHECK" }.map { it.linkedHarmfulAnchorId to it.dateEpochDay }.toSet()
-    }
-    val perDay = remember(habits, crossByHabitDay, checkByHabitDay, since, days, today) {
+    val perDay = remember(habits, entryByHabitDay, since, days) {
         (0 until days).associate { offset ->
-            val date = since.plusDays(offset.toLong())
-            val epochDay = date.toEpochDay()
+            val epochDay = since.plusDays(offset.toLong()).toEpochDay()
             var held = 0
             var crossed = 0
             habits.forEach { h ->
-                val createdDate = if (h.createdAtEpochDay > 0) LocalDate.ofEpochDay(h.createdAtEpochDay) else date
-                if (date.isBefore(createdDate)) return@forEach
-                when {
-                    (h.syncId to epochDay) in crossByHabitDay -> crossed++
-                    date.isBefore(today) -> held++
-                    (h.syncId to epochDay) in checkByHabitDay -> held++
+                val entry = entryByHabitDay[h.syncId to epochDay]
+                if (entry != null) {
+                    if (entry.amount.isBlank()) held++ else crossed++
                 }
             }
             epochDay to (held to crossed)
@@ -653,12 +646,12 @@ private data class Achievement(val title: String, val description: String, val i
 @Composable
 private fun AchievementsTab(
     habits: List<Habit>,
-    impulseLogs: List<ImpulseLog>,
+    journalEntries: List<HabitJournalEntry>,
     stats: HistoryStats
 ) {
-    val impulseChecks = impulseLogs.count { it.outcome == "CHECK" }
+    val cleanDiaryDays = journalEntries.count { it.amount.isBlank() }
     val libraryEntries = habits.count { !it.isTracked }
-    val achievements = remember(stats, impulseChecks, libraryEntries, habits) {
+    val achievements = remember(stats, cleanDiaryDays, libraryEntries, habits) {
         listOf(
             Achievement("Первый шаг", "Выполните первую привычку", Icons.Filled.EmojiEvents, stats.totalCompletionsEver >= 1),
             Achievement("Неделя силы", "Серия из 7 дней по одной привычке", Icons.Filled.EmojiEvents, stats.bestStreakEver >= 7),
@@ -666,7 +659,7 @@ private fun AchievementsTab(
             Achievement("100 побед", "100 отметок о выполнении всего", Icons.Filled.EmojiEvents, stats.totalCompletionsEver >= 100),
             Achievement("500 побед", "500 отметок о выполнении всего", Icons.Filled.EmojiEvents, stats.totalCompletionsEver >= 500),
             Achievement("Идеальная неделя", "Все привычки выполнены все 7 дней подряд", Icons.Filled.EmojiEvents, stats.perfectDaysThisWeek >= 7),
-            Achievement("Мастер позыва", "10 удержанных позывов", Icons.Filled.EmojiEvents, impulseChecks >= 10),
+            Achievement("Мастер дневника", "10 чистых дней в дневнике вредных привычек", Icons.Filled.EmojiEvents, cleanDiaryDays >= 10),
             Achievement("Библиотекарь", "5 привычек в библиотеке опор", Icons.Filled.EmojiEvents, libraryEntries >= 5)
         )
     }

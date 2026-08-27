@@ -6,9 +6,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Icon
@@ -37,7 +37,7 @@ import com.atomichabits.tracker.ui.detail.HabitDetailScreen
 import com.atomichabits.tracker.ui.habits.HabitsListScreen
 import com.atomichabits.tracker.ui.history.HistoryScreen
 import com.atomichabits.tracker.ui.home.HomeScreen
-import com.atomichabits.tracker.ui.impulse.ImpulseScreen
+import com.atomichabits.tracker.ui.journal.HabitJournalScreen
 import com.atomichabits.tracker.ui.scorecard.ScorecardScreen
 import com.atomichabits.tracker.ui.settings.SettingsScreen
 import java.net.URLDecoder
@@ -50,13 +50,13 @@ object Routes {
     const val SETTINGS = "settings"
     const val ADD_EDIT = "add_edit"
     const val DETAIL = "detail"
-    const val IMPULSE = "impulse"
+    const val JOURNAL = "journal"
     const val SCORECARD = "scorecard"
     const val ARG_HABIT_ID = "habitId"
     const val ARG_INITIAL_NAME = "initialName"
     const val ARG_INITIAL_TYPE = "initialType"
     const val ARG_INITIAL_TRACKED = "initialTracked"
-    const val ARG_ANCHOR_ID = "anchorId"
+    const val ARG_JOURNAL_HABIT_ID = "journalHabitId"
 
     fun addEdit(
         habitId: Long? = null,
@@ -84,7 +84,7 @@ private data class BottomTab(
 private val BOTTOM_TABS = listOf(
     BottomTab(Routes.HOME, "Сегодня", Icons.Filled.Today),
     BottomTab(Routes.HABITS, "Привычки", Icons.Filled.CheckCircle),
-    BottomTab(Routes.IMPULSE, "Позыв", Icons.Filled.Bolt, emphasized = true),
+    BottomTab(Routes.JOURNAL, "Дневник", Icons.Filled.MenuBook, emphasized = true),
     BottomTab(Routes.HISTORY, "История", Icons.Filled.History),
     BottomTab(Routes.SETTINGS, "Я", Icons.Filled.Person)
 )
@@ -148,18 +148,18 @@ fun AppNavigation(app: HabitTrackerApp) {
                     app = app,
                     onAddHabit = { navController.navigate(Routes.addEdit()) },
                     onOpenHabit = { id -> navController.navigate(Routes.detail(id)) },
-                    onOpenImpulse = { anchorId ->
-                        navController.navigate(Routes.IMPULSE) { launchSingleTop = true }
-                        navController.currentBackStackEntry?.savedStateHandle?.set(Routes.ARG_ANCHOR_ID, anchorId)
+                    onOpenJournal = { habitId ->
+                        navController.navigate(Routes.JOURNAL) { launchSingleTop = true }
+                        navController.currentBackStackEntry?.savedStateHandle?.set(Routes.ARG_JOURNAL_HABIT_ID, habitId)
                     }
                 )
             }
 
-            composable(Routes.IMPULSE) { entry ->
-                ImpulseScreen(
+            composable(Routes.JOURNAL) { entry ->
+                HabitJournalScreen(
                     app = app,
                     onBack = { navController.popBackStack() },
-                    initialAnchorId = entry.savedStateHandle.remove<String>(Routes.ARG_ANCHOR_ID)
+                    initialHabitId = entry.savedStateHandle.remove<Long>(Routes.ARG_JOURNAL_HABIT_ID)
                 )
             }
 

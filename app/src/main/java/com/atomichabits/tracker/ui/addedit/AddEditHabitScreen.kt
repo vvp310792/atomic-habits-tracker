@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.Habit
-import com.atomichabits.tracker.data.computeDaysWithout
+import com.atomichabits.tracker.data.computeJournalDaysWithout
 import com.atomichabits.tracker.notifications.ReminderScheduler
 import com.atomichabits.tracker.ui.components.CategoryPicker
 import com.atomichabits.tracker.ui.components.EmojiPicker
@@ -312,9 +312,9 @@ fun AddEditHabitScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
                 if (id != 0L && isTracked) {
-                    val allImpulseLogs by app.impulseRepository.observeAll().collectAsState(initial = emptyList())
-                    val daysWithout = remember(allImpulseLogs, syncId, createdAtEpochDay) {
-                        computeDaysWithout(syncId, createdAtEpochDay, allImpulseLogs)
+                    val allJournalEntries by app.journalRepository.observeAll().collectAsState(initial = emptyList())
+                    val daysWithout = remember(allJournalEntries, syncId, createdAtEpochDay) {
+                        computeJournalDaysWithout(syncId, createdAtEpochDay, allJournalEntries)
                     }
                     if (daysWithout.currentDays > 0) {
                         Text(

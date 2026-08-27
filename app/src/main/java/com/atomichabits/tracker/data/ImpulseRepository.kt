@@ -55,9 +55,14 @@ class ImpulseRepository(
         }
     }
 
-    /** See the top-level [computeDaysWithout] - kept as a method too so existing
-     * call sites (`app.impulseRepository.computeDaysWithout(...)`) don't need to
-     * change; this just delegates. */
+    /**
+     * See the top-level [computeDaysWithout]. Kept here as a legacy delegating
+     * method - all UI call sites now use the diary-based
+     * [computeJournalDaysWithout] instead (see HabitJournalRepository.kt); this
+     * one and the impulse_logs data behind it stay in place purely as
+     * historical data (old "Позыв" check/cross records), not because anything
+     * still calls this for a live number.
+     */
     fun computeDaysWithout(habit: Habit, allLogs: List<ImpulseLog>): DaysWithoutInfo =
         computeDaysWithout(habit.syncId, habit.createdAtEpochDay, allLogs)
 }

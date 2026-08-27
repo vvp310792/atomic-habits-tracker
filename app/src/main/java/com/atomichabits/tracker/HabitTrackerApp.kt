@@ -2,6 +2,7 @@ package com.atomichabits.tracker
 
 import android.app.Application
 import com.atomichabits.tracker.data.AppDatabase
+import com.atomichabits.tracker.data.HabitJournalRepository
 import com.atomichabits.tracker.data.HabitRepository
 import com.atomichabits.tracker.data.IdentityRepository
 import com.atomichabits.tracker.data.ImpulseRepository
@@ -32,6 +33,14 @@ class HabitTrackerApp : Application() {
     val impulseRepository: ImpulseRepository by lazy {
         ImpulseRepository(
             database.impulseLogDao(),
+            syncManager = syncManager,
+            currentUid = { authManager.currentUser?.uid }
+        )
+    }
+
+    val journalRepository: HabitJournalRepository by lazy {
+        HabitJournalRepository(
+            database.habitJournalEntryDao(),
             syncManager = syncManager,
             currentUid = { authManager.currentUser?.uid }
         )

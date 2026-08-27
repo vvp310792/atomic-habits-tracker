@@ -9,8 +9,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import java.util.UUID
 
 @Database(
-    entities = [Habit::class, HabitLog::class, ImpulseLog::class, Identity::class],
-    version = 16,
+    entities = [Habit::class, HabitLog::class, ImpulseLog::class, Identity::class, HabitJournalEntry::class],
+    version = 17,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -19,6 +19,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun habitLogDao(): HabitLogDao
     abstract fun impulseLogDao(): ImpulseLogDao
     abstract fun identityDao(): IdentityDao
+    abstract fun habitJournalEntryDao(): HabitJournalEntryDao
 
     companion object {
         @Volatile
@@ -258,6 +259,44 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v16 -> v17: replaces the old check/cross "Позыв" screen with a daily
+         * diary per harmful habit (Misuzu Nakashima's CBT method - see
+         * HabitJournalEntry). Adds the habit_journal_entries table and
+         * Habit.journalCycleStartEpochDay (start of the current 30-day cycle).
+         * impulse_logs is deliberately left in place, unused going forward, for
+         * historical data rather than risking a destructive migration.
+         */
+        private val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE habits ADD COLUMN journalCycleStartEpochDay INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS habit_journal_entries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        syncId TEXT NOT NULL DEFAULT '',
+                        habitId INTEGER NOT NULL DEFAULT 0,
+                        habitSyncId TEXT NOT NULL DEFAULT '',
+                        dateEpochDay INTEGER NOT NULL DEFAULT 0,
+                        todaysEvents TEXT NOT NULL DEFAULT '',
+                        hadIncident INTEGER NOT NULL DEFAULT 0,
+                        amount TEXT NOT NULL DEFAULT '',
+                        whatIWanted TEXT NOT NULL DEFAULT '',
+                        substituteBehavior TEXT NOT NULL DEFAULT '',
+                        substituteSucceeded INTEGER NOT NULL DEFAULT 0,
+                        cycleStartEpochDay INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_habit_journal_entries_syncId ON habit_journal_entries(syncId)"
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_habit_journal_entries_habitId_dateEpochDay ON habit_journal_entries(habitId, dateEpochDay)"
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -268,7 +307,7 @@ abstract class AppDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
                         MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-                        MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16
+                        MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17
                     )
                     .build()
                 INSTANCE = instance

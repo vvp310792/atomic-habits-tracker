@@ -62,6 +62,12 @@ import androidx.room.PrimaryKey
  * indulgence bundled onto this habit, shown with its own lock badge in the UI
  * rather than folded into [lawAttractive] prose.
  *
+ * [journalCycleStartEpochDay] marks the start of this HARMFUL habit's current
+ * 30-day diary cycle (Misuzu Nakashima's CBT method - see HabitJournalEntry).
+ * 0 = no cycle started yet. Starting a fresh cycle after a 30-day review does
+ * not erase past entries - they stay in HabitJournalEntry for history, just
+ * out of the "current cycle" view.
+ *
  * Dopamine-balance self-binding (Anna Lembke, "Dopamine Nation"): overcoming an
  * urge in the moment is much harder than deciding, ahead of time while calm, to
  * physically remove access. [selfBindingAction] is a free-text description of
@@ -91,7 +97,7 @@ import androidx.room.PrimaryKey
  * reference (a stacking anchor, an Impulse-screen link target, or a backlog
  * idea). A habit can be USEFUL and tracked, USEFUL and not-yet-tracked, etc. -
  * the two are independent. [alternativeSuggestion]/[whyItMatters] are only
- * meaningful for HARMFUL entries (see FirestoreSyncManager/ImpulseScreen).
+ * meaningful for HARMFUL entries (see FirestoreSyncManager/HabitJournalScreen).
  */
 @Entity(tableName = "habits", indices = [Index(value = ["syncId"], unique = true)])
 data class Habit(
@@ -126,5 +132,6 @@ data class Habit(
     val difficultyBumpedAtEpochDay: Long = 0,
     val temptationBundle: String = "",
     val manuallyMastered: Boolean = false,
-    val selfBindingAction: String = ""
+    val selfBindingAction: String = "",
+    val journalCycleStartEpochDay: Long = 0
 )

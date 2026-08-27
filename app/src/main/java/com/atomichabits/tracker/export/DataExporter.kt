@@ -4,10 +4,11 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
 import com.atomichabits.tracker.data.HabitDao
+import com.atomichabits.tracker.data.HabitJournalEntryDao
 import com.atomichabits.tracker.data.HabitLogDao
 import com.atomichabits.tracker.data.IdentityDao
 import com.atomichabits.tracker.data.ImpulseLogDao
-import com.atomichabits.tracker.data.computeDaysWithout
+import com.atomichabits.tracker.data.computeJournalDaysWithout
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -33,12 +34,14 @@ object DataExporter {
         habitDao: HabitDao,
         habitLogDao: HabitLogDao,
         identityDao: IdentityDao,
-        impulseLogDao: ImpulseLogDao
+        impulseLogDao: ImpulseLogDao,
+        journalDao: HabitJournalEntryDao
     ): File {
         val habits = habitDao.getAllOnce()
         val logs = habitLogDao.getAllOnce()
         val identities = identityDao.getAllOnce()
         val impulseLogs = impulseLogDao.getAllOnce()
+        val journalEntries = journalDao.getAllOnce()
         val completedDatesByHabitId = logs.filter { it.completed }.groupBy { it.habitId }
 
         val root = JSONObject().apply {
@@ -89,9 +92,12 @@ object DataExporter {
                             if (habit.whyItMatters.isNotBlank()) put("whyItMatters", habit.whyItMatters)
                             if (habit.selfBindingAction.isNotBlank()) put("selfBindingAction", habit.selfBindingAction)
                             if (habit.isTracked) {
-                                val daysWithout = computeDaysWithout(habit.syncId, habit.createdAtEpochDay, impulseLogs)
+                                val daysWithout = computeJournalDaysWithout(habit.syncId, habit.createdAtEpochDay, journalEntries)
                                 put("daysWithoutSlip", daysWithout.currentDays)
                                 put("bestDaysWithoutSlip", daysWithout.bestDays)
+                                if (habit.journalCycleStartEpochDay > 0) {
+                                    put("journalCycleStarted", LocalDate.ofEpochDay(habit.journalCycleStartEpochDay).toString())
+                                }
                             }
                         }
                         if (habit.stackAnchorLabel.isNotBlank()) put("stackedAfter", habit.stackAnchorLabel)
@@ -122,6 +128,27 @@ object DataExporter {
                         if (log.note.isNotBlank()) put("note", log.note)
                         if (log.linkedHarmfulAnchorLabel.isNotBlank()) {
                             put("linkedHabit", log.linkedHarmfulAnchorLabel)
+                        }
+                    })
+                }
+            })
+
+            // The current daily-diary model (Misuzu Nakashima's CBT method), which
+            // replaced the check/cross "Позыв" screen above - this is now the
+            // primary source of truth for harmful-habit data going forward.
+            put("journalEntries", JSONArray().apply {
+                val habitNameBySyncId = habits.associate { it.syncId to it.name }
+                journalEntries.sortedBy { it.dateEpochDay }.forEach { entry ->
+                    put(JSONObject().apply {
+                        put("habit", habitNameBySyncId[entry.habitSyncId] ?: entry.habitSyncId)
+                        put("date", LocalDate.ofEpochDay(entry.dateEpochDay).toString())
+                        if (entry.todaysEvents.isNotBlank()) put("todaysEvents", entry.todaysEvents)
+                        put("hadIncident", entry.hadIncident)
+                        put("amount", entry.amount)
+                        if (entry.whatIWanted.isNotBlank()) put("whatIWanted", entry.whatIWanted)
+                        if (entry.substituteBehavior.isNotBlank()) {
+                            put("substituteBehavior", entry.substituteBehavior)
+                            put("substituteSucceeded", entry.substituteSucceeded)
                         }
                     })
                 }
