@@ -37,7 +37,14 @@ class ReminderReceiver : BroadcastReceiver() {
                         val isPaused = fresh != null && isHabitPausedOn(fresh.syncId, LocalDate.now(), pausePeriods)
                         val todayIsActive = fresh != null &&
                             ReminderScheduler.isActiveOn(fresh.activeDays, java.util.Calendar.getInstance())
-                        if (fresh != null && todayIsActive && !isPaused) {
+                        // The main point of this fix: a notification for a habit that's
+                        // already checked off today is noise, not a reminder - it drowns
+                        // out the ones that still need attention and trains the person to
+                        // tune out notifications generally. Skip it if today's log already
+                        // says done.
+                        val alreadyDoneToday = app.database.habitLogDao()
+                            .getForDate(habitId, LocalDate.now().toEpochDay())?.completed == true
+                        if (fresh != null && todayIsActive && !isPaused && !alreadyDoneToday) {
                             val name = intent.getStringExtra(ReminderScheduler.EXTRA_HABIT_NAME) ?: ""
                             NotificationHelper.showReminder(context, habitId, name)
                         }
