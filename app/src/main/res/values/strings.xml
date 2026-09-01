@@ -17,6 +17,7 @@
     <string name="habits_section_yellow">Желаемые и нейтральные</string>
     <string name="habits_section_red">Вредные привычки</string>
     <string name="habits_not_tracked_badge">не отслеживается</string>
+    <string name="habits_paused_badge">\u23F8 На паузе</string>
     <string name="habits_mastery_done_badge">🎓 Освоено</string>
     <string name="habits_mastery_progress_badge">%1$d%% к автоматизму</string>
     <string name="habits_reorder_hint">Зажмите карточку и перетащите, чтобы изменить порядок или время суток</string>
@@ -193,6 +194,18 @@
     <string name="settings_account_signed_in">Вход выполнен: %1$s</string>
     <string name="settings_account_sign_out">Выйти</string>
     <string name="settings_account_error">Не удалось выполнить действие. Попробуйте ещё раз</string>
+    <string name="settings_pause_section">Паузы (командировки)</string>
+    <string name="settings_pause_hint">Привычки, отмеченные на период поездки, не портят стрик и прогресс освоения, пока идут — как будто этих дней не было в расписании. Если всё же выполнишь — это всё равно засчитается.</string>
+    <string name="settings_pause_default_label">Пауза</string>
+    <string name="settings_pause_active_badge">\u2022 идёт сейчас</string>
+    <string name="settings_pause_add_button">Добавить паузу</string>
+    <string name="settings_pause_add_title">Новая пауза</string>
+    <string name="settings_pause_label_field">Название (необязательно)</string>
+    <string name="settings_pause_label_hint">Например: Командировка в Москву</string>
+    <string name="settings_pause_pick_start">Выбрать дату начала</string>
+    <string name="settings_pause_pick_end">Выбрать дату конца</string>
+    <string name="settings_pause_pick_habits">Какие привычки поставить на паузу</string>
+    <string name="settings_pause_no_tracked_habits">Нет отслеживаемых привычек</string>
     <string name="settings_notifications_section">Уведомления</string>
     <string name="settings_notifications_permission">Разрешить уведомления</string>
 

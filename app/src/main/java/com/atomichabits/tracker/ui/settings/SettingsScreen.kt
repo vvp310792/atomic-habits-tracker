@@ -22,6 +22,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -33,6 +36,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -41,6 +45,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -51,7 +56,9 @@ import androidx.core.content.ContextCompat
 import com.atomichabits.tracker.BuildConfig
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
+import com.atomichabits.tracker.data.Habit
 import com.atomichabits.tracker.data.Identity
+import com.atomichabits.tracker.data.PausePeriod
 import com.atomichabits.tracker.export.DataExporter
 import com.atomichabits.tracker.update.ApkInstaller
 import com.atomichabits.tracker.update.UpdateCheckResult
@@ -60,7 +67,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -293,6 +302,8 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null, onOpenSco
                 }
             }
 
+            PausePeriodsSection(app)
+
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.settings_notifications_section), style = MaterialTheme.typography.titleMedium)
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
@@ -495,5 +506,221 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null, onOpenSco
                 )
             }
         )
+    }
+}
+
+/**
+ * Travel/business-trip pause management (see PausePeriod.kt): a per-trip list
+ * of habits explicitly excused from scheduling for statistics purposes over a
+ * fixed date range, so a business trip doesn't dent a streak, completion
+ * rate, or mastery progress that took months to build.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PausePeriodsSection(app: HabitTrackerApp) {
+    val scope = rememberCoroutineScope()
+    val periods by app.pausePeriodRepository.observeAll().collectAsState(initial = emptyList())
+    val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
+    val trackedHabits = remember(habits) { habits.filter { it.isTracked } }
+    val today = remember { LocalDate.now() }
+    var showAdd by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(stringResource(R.string.settings_pause_section), style = MaterialTheme.typography.titleMedium)
+        Text(
+            stringResource(R.string.settings_pause_hint),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        )
+
+        periods.forEach { period ->
+            val isActive = today.toEpochDay() in period.startEpochDay..period.endEpochDay
+            val pausedNames = remember(period, trackedHabits) {
+                val ids = period.pausedHabitSyncIds.split(",").map { it.trim() }.toSet()
+                trackedHabits.filter { it.syncId in ids }.joinToString(", ") { it.name }
+            }
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isActive) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    }
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            (period.label.ifBlank { stringResource(R.string.settings_pause_default_label) }) +
+                                if (isActive) " " + stringResource(R.string.settings_pause_active_badge) else "",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            "${LocalDate.ofEpochDay(period.startEpochDay)} \u2014 ${LocalDate.ofEpochDay(period.endEpochDay)}",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                        if (pausedNames.isNotBlank()) {
+                            Text(
+                                pausedNames,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                    IconButton(onClick = { scope.launch { app.pausePeriodRepository.delete(period) } }) {
+                        Icon(Icons.Filled.Delete, contentDescription = null)
+                    }
+                }
+            }
+        }
+
+        OutlinedButton(onClick = { showAdd = true }, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.settings_pause_add_button))
+        }
+    }
+
+    if (showAdd) {
+        AddPausePeriodDialog(
+            habits = trackedHabits,
+            onDismiss = { showAdd = false },
+            onSave = { period ->
+                scope.launch { app.pausePeriodRepository.save(period) }
+                showAdd = false
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddPausePeriodDialog(
+    habits: List<Habit>,
+    onDismiss: () -> Unit,
+    onSave: (PausePeriod) -> Unit
+) {
+    var label by remember { mutableStateOf("") }
+    var startDate by remember { mutableStateOf<LocalDate?>(null) }
+    var endDate by remember { mutableStateOf<LocalDate?>(null) }
+    var selectedHabitIds by remember { mutableStateOf(setOf<String>()) }
+    var showStartPicker by remember { mutableStateOf(false) }
+    var showEndPicker by remember { mutableStateOf(false) }
+
+    val canSave = startDate != null && endDate != null && !endDate!!.isBefore(startDate!!) && selectedHabitIds.isNotEmpty()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val s = startDate
+                    val e = endDate
+                    if (s != null && e != null && canSave) {
+                        onSave(
+                            PausePeriod(
+                                startEpochDay = s.toEpochDay(),
+                                endEpochDay = e.toEpochDay(),
+                                label = label.trim(),
+                                pausedHabitSyncIds = selectedHabitIds.joinToString(",")
+                            )
+                        )
+                    }
+                },
+                enabled = canSave
+            ) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        title = { Text(stringResource(R.string.settings_pause_add_title)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = label,
+                    onValueChange = { label = it },
+                    label = { Text(stringResource(R.string.settings_pause_label_field)) },
+                    placeholder = { Text(stringResource(R.string.settings_pause_label_hint)) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedButton(onClick = { showStartPicker = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(startDate?.toString() ?: stringResource(R.string.settings_pause_pick_start))
+                }
+                OutlinedButton(onClick = { showEndPicker = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(endDate?.toString() ?: stringResource(R.string.settings_pause_pick_end))
+                }
+
+                Text(stringResource(R.string.settings_pause_pick_habits), style = MaterialTheme.typography.labelLarge)
+                if (habits.isEmpty()) {
+                    Text(
+                        stringResource(R.string.settings_pause_no_tracked_habits),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                habits.forEach { h ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = h.syncId in selectedHabitIds,
+                            onCheckedChange = { checked ->
+                                selectedHabitIds = if (checked) selectedHabitIds + h.syncId else selectedHabitIds - h.syncId
+                            }
+                        )
+                        Text("${h.emoji} ${h.name}", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+    )
+
+    if (showStartPicker) {
+        SimpleDatePickerDialog(
+            initial = startDate ?: LocalDate.now(),
+            onDismiss = { showStartPicker = false },
+            onConfirm = {
+                startDate = it
+                showStartPicker = false
+            }
+        )
+    }
+    if (showEndPicker) {
+        SimpleDatePickerDialog(
+            initial = endDate ?: startDate ?: LocalDate.now(),
+            onDismiss = { showEndPicker = false },
+            onConfirm = {
+                endDate = it
+                showEndPicker = false
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SimpleDatePickerDialog(initial: LocalDate, onDismiss: () -> Unit, onConfirm: (LocalDate) -> Unit) {
+    val state = rememberDatePickerState(
+        initialSelectedDateMillis = initial.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = {
+                val millis = state.selectedDateMillis
+                if (millis != null) {
+                    onConfirm(Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate())
+                } else {
+                    onDismiss()
+                }
+            }) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
+    ) {
+        DatePicker(state = state)
     }
 }

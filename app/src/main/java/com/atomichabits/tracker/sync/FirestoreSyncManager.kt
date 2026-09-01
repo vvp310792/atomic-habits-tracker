@@ -7,6 +7,7 @@ import com.atomichabits.tracker.data.HabitJournalEntry
 import com.atomichabits.tracker.data.HabitLog
 import com.atomichabits.tracker.data.Identity
 import com.atomichabits.tracker.data.ImpulseLog
+import com.atomichabits.tracker.data.PausePeriod
 import com.atomichabits.tracker.notifications.ReminderScheduler
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FieldValue
@@ -38,6 +39,7 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
     private var impulsesListener: ListenerRegistration? = null
     private var identitiesListener: ListenerRegistration? = null
     private var journalListener: ListenerRegistration? = null
+    private var pausePeriodsListener: ListenerRegistration? = null
     private val scope = CoroutineScope(Dispatchers.IO)
 
     private fun habitsRef(uid: String) = db.collection("users").document(uid).collection("habits")
@@ -45,6 +47,7 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
     private fun impulsesRef(uid: String) = db.collection("users").document(uid).collection("impulses")
     private fun identitiesRef(uid: String) = db.collection("users").document(uid).collection("identities")
     private fun journalRef(uid: String) = db.collection("users").document(uid).collection("journal")
+    private fun pausePeriodsRef(uid: String) = db.collection("users").document(uid).collection("pausePeriods")
 
     /** Attaches realtime listeners for [uid]'s data. Call on sign-in. Safe to call again to re-attach. */
     fun start(uid: String) {
@@ -69,6 +72,10 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
             val changes = snapshot?.documentChanges ?: return@addSnapshotListener
             scope.launch { mergeJournalChanges(changes) }
         }
+        pausePeriodsListener = pausePeriodsRef(uid).addSnapshotListener { snapshot, _ ->
+            val changes = snapshot?.documentChanges ?: return@addSnapshotListener
+            scope.launch { mergePausePeriodChanges(changes) }
+        }
     }
 
     /** Detaches listeners. Call on sign-out. */
@@ -78,11 +85,13 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
         impulsesListener?.remove()
         identitiesListener?.remove()
         journalListener?.remove()
+        pausePeriodsListener?.remove()
         habitsListener = null
         logsListener = null
         impulsesListener = null
         identitiesListener = null
         journalListener = null
+        pausePeriodsListener = null
     }
 
     fun pushHabit(uid: String, habit: Habit) {
@@ -181,6 +190,17 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
         journalRef(uid).document(entry.syncId).set(data, SetOptions.merge())
     }
 
+    fun pushPausePeriod(uid: String, period: PausePeriod) {
+        if (period.syncId.isBlank()) return
+        val data = mapOf(
+            "startEpochDay" to period.startEpochDay,
+            "endEpochDay" to period.endEpochDay,
+            "label" to period.label,
+            "pausedHabitSyncIds" to period.pausedHabitSyncIds
+        )
+        pausePeriodsRef(uid).document(period.syncId).set(data, SetOptions.merge())
+    }
+
     private fun logDocId(habitSyncId: String, dateEpochDay: Long) = "${habitSyncId}_$dateEpochDay"
 
     /** Pushes everything currently local - used right after first sign-in, and as a manual "sync now". */
@@ -195,6 +215,7 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
         database.impulseLogDao().getAllOnce().forEach { log -> pushImpulseLog(uid, log) }
         database.identityDao().getAllOnce().forEach { identity -> pushIdentity(uid, identity) }
         database.habitJournalEntryDao().getAllOnce().forEach { entry -> pushJournalEntry(uid, entry) }
+        database.pausePeriodDao().getAllOnce().forEach { period -> pushPausePeriod(uid, period) }
     }
 
     private suspend fun mergeHabitChanges(changes: List<DocumentChange>) {
@@ -351,6 +372,26 @@ class FirestoreSyncManager(private val database: AppDatabase, private val appCon
                     substituteBehavior = doc.getString("substituteBehavior") ?: "",
                     substituteSucceeded = doc.getBoolean("substituteSucceeded") ?: false,
                     cycleStartEpochDay = doc.getLong("cycleStartEpochDay") ?: 0L
+                )
+            )
+        }
+    }
+
+    private suspend fun mergePausePeriodChanges(changes: List<DocumentChange>) {
+        val periodDao = database.pausePeriodDao()
+        changes.forEach { change ->
+            if (change.type == DocumentChange.Type.REMOVED) return@forEach
+            val doc = change.document
+            val syncId = doc.id
+            val existing = periodDao.getBySyncId(syncId)
+            periodDao.upsert(
+                PausePeriod(
+                    id = existing?.id ?: 0,
+                    syncId = syncId,
+                    startEpochDay = doc.getLong("startEpochDay") ?: 0L,
+                    endEpochDay = doc.getLong("endEpochDay") ?: 0L,
+                    label = doc.getString("label") ?: "",
+                    pausedHabitSyncIds = doc.getString("pausedHabitSyncIds") ?: ""
                 )
             )
         }

@@ -6,6 +6,7 @@ import com.atomichabits.tracker.data.HabitJournalRepository
 import com.atomichabits.tracker.data.HabitRepository
 import com.atomichabits.tracker.data.IdentityRepository
 import com.atomichabits.tracker.data.ImpulseRepository
+import com.atomichabits.tracker.data.PausePeriodRepository
 import com.atomichabits.tracker.notifications.NotificationHelper
 import com.atomichabits.tracker.sync.AuthManager
 import com.atomichabits.tracker.sync.FirestoreSyncManager
@@ -25,6 +26,15 @@ class HabitTrackerApp : Application() {
         HabitRepository(
             database.habitDao(),
             database.habitLogDao(),
+            pausePeriodDao = database.pausePeriodDao(),
+            syncManager = syncManager,
+            currentUid = { authManager.currentUser?.uid }
+        )
+    }
+
+    val pausePeriodRepository: PausePeriodRepository by lazy {
+        PausePeriodRepository(
+            database.pausePeriodDao(),
             syncManager = syncManager,
             currentUid = { authManager.currentUser?.uid }
         )

@@ -8,6 +8,7 @@ import kotlin.math.roundToInt
 class HabitRepository(
     private val habitDao: HabitDao,
     private val habitLogDao: HabitLogDao,
+    private val pausePeriodDao: PausePeriodDao? = null,
     private val syncManager: FirestoreSyncManager? = null,
     private val currentUid: () -> String? = { null }
 ) {
@@ -100,16 +101,21 @@ class HabitRepository(
     /**
      * Computes (currentStreak, bestStreak, completionRatePercent over last 30 days,
      * mastery progress) from the full log history of a habit, respecting its
-     * active days-of-week.
+     * active days-of-week AND any active travel pause (see PausePeriod.kt) -
+     * a paused day is excused from scheduling entirely, exactly like a
+     * non-scheduled day-of-week, so a business trip doesn't dent the streak,
+     * rate, or mastery progress. A completion logged during a paused window
+     * still counts normally - pausing only forgives misses.
      */
     suspend fun computeStats(habit: Habit): HabitStats {
         val logs = habitLogDao.getAllForHabitOnce(habit.id)
         val completedDays = logs.filter { it.completed }.map { it.dateEpochDay }.toSet()
+        val pausePeriods = pausePeriodDao?.getAllOnce().orEmpty()
 
         var current = 0
         var cursor = LocalDate.now()
         while (true) {
-            if (!isActiveOn(habit, cursor)) {
+            if (!isActiveOn(habit, cursor, pausePeriods)) {
                 cursor = cursor.minusDays(1)
                 continue
             }
@@ -138,7 +144,7 @@ class HabitRepository(
         var done = 0
         var day = since
         while (!day.isAfter(LocalDate.now())) {
-            if (isActiveOn(habit, day)) {
+            if (isActiveOn(habit, day, pausePeriods)) {
                 scheduled++
                 if (completedDays.contains(day.toEpochDay())) done++
             }
@@ -146,7 +152,7 @@ class HabitRepository(
         }
         val rate = if (scheduled == 0) 0 else (done * 100 / scheduled)
 
-        val mastery = computeMastery(habit, completedDays)
+        val mastery = computeMastery(habit, completedDays, pausePeriods)
         // A habit can also be mastered by self-declaration (Habit.manuallyMastered),
         // independent of tracked history - see the class doc on that field.
         val isMastered = mastery.isMastered || habit.manuallyMastered
@@ -198,9 +204,17 @@ class HabitRepository(
      * This is a plain (non-suspend) function, callable both from [computeStats]
      * (which already has the log history) and directly from a UI layer that has
      * already loaded all logs itself (e.g. for showing progress across a whole
-     * list of habits without a DB round-trip per row).
+     * list of habits without a DB round-trip per row). [pausePeriods] is
+     * likewise optional for the same reason - pass in whatever's already loaded
+     * as UI state; a paused day is excused from scheduling exactly like a
+     * non-scheduled day-of-week, so it counts toward neither the target nor
+     * actual performance (see PausePeriod.kt).
      */
-    fun computeMastery(habit: Habit, completedEpochDays: Set<Long>): MasteryInfo {
+    fun computeMastery(
+        habit: Habit,
+        completedEpochDays: Set<Long>,
+        pausePeriods: List<PausePeriod> = emptyList()
+    ): MasteryInfo {
         val today = LocalDate.now()
 
         // Walk backward from today collecting only *scheduled* days until we
@@ -210,7 +224,7 @@ class HabitRepository(
         var nominalScheduled = 0
         var calendarStep = 0
         while (nominalScheduled < MASTERY_WINDOW_DAYS && calendarStep < MASTERY_MAX_CALENDAR_LOOKBACK_DAYS) {
-            if (isActiveOn(habit, windowStart)) nominalScheduled++
+            if (isActiveOn(habit, windowStart, pausePeriods)) nominalScheduled++
             if (nominalScheduled < MASTERY_WINDOW_DAYS) windowStart = windowStart.minusDays(1)
             calendarStep++
         }
@@ -227,7 +241,7 @@ class HabitRepository(
         var done = 0
         var day = since
         while (!day.isAfter(today)) {
-            if (isActiveOn(habit, day)) {
+            if (isActiveOn(habit, day, pausePeriods)) {
                 scheduled++
                 if (completedEpochDays.contains(day.toEpochDay())) done++
             }
@@ -241,9 +255,17 @@ class HabitRepository(
         return MasteryInfo(progressPercent = progress, scheduledDays = scheduled, isMastered = mastered)
     }
 
-    private fun isActiveOn(habit: Habit, date: LocalDate): Boolean {
+    /**
+     * True if [habit] is due on [date]: its own day-of-week schedule says so,
+     * AND it isn't currently excused by a travel pause (see PausePeriod.kt) -
+     * a paused day is treated identically to a non-scheduled day-of-week
+     * everywhere this is used (streaks, completion rate, mastery), so it's
+     * simply skipped rather than counted as a miss.
+     */
+    private fun isActiveOn(habit: Habit, date: LocalDate, pausePeriods: List<PausePeriod> = emptyList()): Boolean {
         val bit = date.dayOfWeek.value - 1 // Monday=0 .. Sunday=6
-        return (habit.activeDays shr bit) and 1 == 1
+        val scheduledByWeekday = (habit.activeDays shr bit) and 1 == 1
+        return scheduledByWeekday && !isHabitPausedOn(habit.syncId, date, pausePeriods)
     }
 }
 

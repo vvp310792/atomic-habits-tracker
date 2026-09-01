@@ -9,8 +9,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import java.util.UUID
 
 @Database(
-    entities = [Habit::class, HabitLog::class, ImpulseLog::class, Identity::class, HabitJournalEntry::class],
-    version = 18,
+    entities = [Habit::class, HabitLog::class, ImpulseLog::class, Identity::class, HabitJournalEntry::class, PausePeriod::class],
+    version = 19,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -20,6 +20,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun impulseLogDao(): ImpulseLogDao
     abstract fun identityDao(): IdentityDao
     abstract fun habitJournalEntryDao(): HabitJournalEntryDao
+    abstract fun pausePeriodDao(): PausePeriodDao
 
     companion object {
         @Volatile
@@ -315,6 +316,31 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v18 -> v19: adds pause_periods (travel/business-trip windows). Specific
+         * habits, picked per-trip, are excused from streak/rate/mastery scheduling
+         * for the date range - see PausePeriod.kt.
+         */
+        private val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS pause_periods (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        syncId TEXT NOT NULL DEFAULT '',
+                        startEpochDay INTEGER NOT NULL DEFAULT 0,
+                        endEpochDay INTEGER NOT NULL DEFAULT 0,
+                        label TEXT NOT NULL DEFAULT '',
+                        pausedHabitSyncIds TEXT NOT NULL DEFAULT ''
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_pause_periods_syncId ON pause_periods(syncId)"
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -326,7 +352,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
                         MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
                         MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
-                        MIGRATION_17_18
+                        MIGRATION_17_18, MIGRATION_18_19
                     )
                     .build()
                 INSTANCE = instance

@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import java.time.LocalDate
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.DaysWithoutInfo
@@ -59,10 +60,20 @@ fun HabitsListScreen(
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
     val journalEntries by app.journalRepository.observeAll().collectAsState(initial = emptyList())
     val allLogs by app.repository.observeAllLogs().collectAsState(initial = emptyList())
+    val pausePeriods by app.pausePeriodRepository.observeAll().collectAsState(initial = emptyList())
+    val today = remember { LocalDate.now() }
 
     val greenHabits = habits.filter { it.qualityType == "USEFUL" }
     val yellowHabits = habits.filter { it.qualityType == "NEUTRAL" || it.qualityType == "DESIRED" }
     val redHabits = habits.filter { it.qualityType == "HARMFUL" }
+
+    // Currently-paused habits (see PausePeriod.kt) - shown as a small badge so
+    // "why isn't my streak growing" has an obvious answer while travelling.
+    val pausedHabitSyncIds = remember(pausePeriods, today) {
+        pausePeriods.filter { today.toEpochDay() in it.startEpochDay..it.endEpochDay }
+            .flatMap { it.pausedHabitSyncIds.split(",").map { id -> id.trim() } }
+            .toSet()
+    }
 
     // Habit-formation mastery progress per habit: either computed from log
     // history (HabitRepository.computeMastery, tracked habits only) or a flat
@@ -71,7 +82,7 @@ fun HabitsListScreen(
     // scheduledDays that clears the same >=14 "enough evidence" gate the
     // computed path uses, letting the row-rendering logic stay identical for
     // both cases.
-    val masteryByHabit = remember(habits, allLogs) {
+    val masteryByHabit = remember(habits, allLogs, pausePeriods) {
         val doneEpochDaysByHabitId = allLogs
             .filter { it.completed }
             .groupBy({ it.habitId }, { it.dateEpochDay })
@@ -79,7 +90,7 @@ fun HabitsListScreen(
         habits.mapNotNull { h ->
             val mastery = when {
                 h.manuallyMastered -> MasteryInfo(progressPercent = 100, scheduledDays = 14, isMastered = true)
-                h.isTracked -> app.repository.computeMastery(h, doneEpochDaysByHabitId[h.id].orEmpty())
+                h.isTracked -> app.repository.computeMastery(h, doneEpochDaysByHabitId[h.id].orEmpty(), pausePeriods)
                 else -> null
             }
             mastery?.let { h.syncId to it }
@@ -114,6 +125,7 @@ fun HabitsListScreen(
                     tint = Color(0xFF3DBE8B),
                     habits = greenHabits,
                     masteryByHabit = masteryByHabit,
+                    pausedHabitSyncIds = pausedHabitSyncIds,
                     onAdd = { onAddHabit("USEFUL", true) },
                     onMove = { habit, toTime -> app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
                     onReorder = { orderedItems -> app.launchPersistent { app.repository.reorder(orderedItems.map { it.id }) } },
@@ -127,6 +139,7 @@ fun HabitsListScreen(
                     tint = Color(0xFFF2A93B),
                     habits = yellowHabits,
                     masteryByHabit = masteryByHabit,
+                    pausedHabitSyncIds = pausedHabitSyncIds,
                     onAdd = { onAddHabit("DESIRED", false) },
                     onMove = { habit, toTime -> app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
                     onReorder = { orderedItems -> app.launchPersistent { app.repository.reorder(orderedItems.map { it.id }) } },
@@ -141,6 +154,7 @@ fun HabitsListScreen(
                     habits = redHabits,
                     masteryByHabit = masteryByHabit,
                     daysWithoutByHabit = daysWithoutByHabit,
+                    pausedHabitSyncIds = pausedHabitSyncIds,
                     onAdd = { onAddHabit("HARMFUL", false) },
                     onMove = { habit, toTime -> app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
                     onReorder = { orderedItems -> app.launchPersistent { app.repository.reorder(orderedItems.map { it.id }) } },
@@ -207,6 +221,7 @@ private fun ColoredQualitySection(
     habits: List<Habit>,
     masteryByHabit: Map<String, MasteryInfo>,
     daysWithoutByHabit: Map<String, DaysWithoutInfo> = emptyMap(),
+    pausedHabitSyncIds: Set<String> = emptySet(),
     onAdd: () -> Unit,
     onMove: (Habit, String) -> Unit,
     onReorder: (List<Habit>) -> Unit,
@@ -251,7 +266,7 @@ private fun ColoredQualitySection(
                     onReorder = { _, orderedChains -> onReorder(orderedChains.flatMap { it.habits }) },
                     emptyGroupHint = stringResource(R.string.home_group_empty_hint)
                 ) { chain, isDragging ->
-                    HabitChainBlock(chain, masteryByHabit, daysWithoutByHabit, isDragging, onClick)
+                    HabitChainBlock(chain, masteryByHabit, daysWithoutByHabit, pausedHabitSyncIds, isDragging, onClick)
                 }
             }
         }
@@ -269,13 +284,14 @@ private fun HabitChainBlock(
     chain: HabitChain,
     masteryByHabit: Map<String, MasteryInfo>,
     daysWithoutByHabit: Map<String, DaysWithoutInfo>,
+    pausedHabitSyncIds: Set<String>,
     isDragging: Boolean,
     onClick: (Habit) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         chain.habits.forEachIndexed { index, habit ->
             if (index == 0) {
-                UniversalHabitRow(habit, masteryByHabit[habit.syncId], daysWithoutByHabit[habit.syncId]) { onClick(habit) }
+                UniversalHabitRow(habit, masteryByHabit[habit.syncId], daysWithoutByHabit[habit.syncId], habit.syncId in pausedHabitSyncIds) { onClick(habit) }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Spacer(Modifier.size(20.dp))
@@ -286,7 +302,7 @@ private fun HabitChainBlock(
                         modifier = Modifier.padding(end = 4.dp)
                     )
                     Box(modifier = Modifier.weight(1f)) {
-                        UniversalHabitRow(habit, masteryByHabit[habit.syncId], daysWithoutByHabit[habit.syncId]) { onClick(habit) }
+                        UniversalHabitRow(habit, masteryByHabit[habit.syncId], daysWithoutByHabit[habit.syncId], habit.syncId in pausedHabitSyncIds) { onClick(habit) }
                     }
                 }
             }
@@ -295,7 +311,7 @@ private fun HabitChainBlock(
 }
 
 @Composable
-private fun UniversalHabitRow(habit: Habit, mastery: MasteryInfo?, daysWithout: DaysWithoutInfo?, onClick: () -> Unit) {
+private fun UniversalHabitRow(habit: Habit, mastery: MasteryInfo?, daysWithout: DaysWithoutInfo?, isPaused: Boolean, onClick: () -> Unit) {
     val accent = remember(habit.colorHex) {
         runCatching { Color(android.graphics.Color.parseColor(habit.colorHex)) }
             .getOrDefault(Color(0xFF7C6CF0))
@@ -366,6 +382,13 @@ private fun UniversalHabitRow(habit: Habit, mastery: MasteryInfo?, daysWithout: 
                         "\uD83C\uDFAF " + habit.whyItMatters,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+                if (isPaused) {
+                    Text(
+                        stringResource(R.string.habits_paused_badge),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
                 if (daysWithout != null && daysWithout.currentDays > 0) {
