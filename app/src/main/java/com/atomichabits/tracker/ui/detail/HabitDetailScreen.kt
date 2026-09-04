@@ -40,6 +40,7 @@ import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.Habit
 import com.atomichabits.tracker.data.HabitStats
+import com.atomichabits.tracker.data.MASTERY_MIN_DISPLAY_DAYS
 import com.atomichabits.tracker.ui.components.CompletionBarChart
 import com.atomichabits.tracker.ui.components.HabitHeatmap
 import java.time.LocalDate
@@ -254,7 +255,7 @@ private fun MasteryProgressSection(stats: HabitStats, manuallyMastered: Boolean)
         Text(
             when {
                 manuallyMastered -> stringResource(R.string.detail_mastery_hint_manual)
-                stats.masteryScheduledDays < 14 -> stringResource(R.string.detail_mastery_hint_not_enough_data)
+                stats.masteryScheduledDays < MASTERY_MIN_DISPLAY_DAYS -> stringResource(R.string.detail_mastery_hint_not_enough_data)
                 else -> stringResource(R.string.detail_mastery_hint, stats.masteryScheduledDays)
             },
             style = MaterialTheme.typography.bodySmall,

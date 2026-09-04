@@ -40,6 +40,7 @@ import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.DaysWithoutInfo
 import com.atomichabits.tracker.data.Habit
+import com.atomichabits.tracker.data.MASTERY_MIN_DISPLAY_DAYS
 import com.atomichabits.tracker.data.MasteryInfo
 import com.atomichabits.tracker.data.computeJournalDaysWithout
 import com.atomichabits.tracker.ui.components.CategoryTag
@@ -89,7 +90,7 @@ fun HabitsListScreen(
             .mapValues { it.value.toSet() }
         habits.mapNotNull { h ->
             val mastery = when {
-                h.manuallyMastered -> MasteryInfo(progressPercent = 100, scheduledDays = 14, isMastered = true)
+                h.manuallyMastered -> MasteryInfo(progressPercent = 100, scheduledDays = MASTERY_MIN_DISPLAY_DAYS, isMastered = true)
                 h.isTracked -> app.repository.computeMastery(h, doneEpochDaysByHabitId[h.id].orEmpty(), pausePeriods)
                 else -> null
             }
@@ -398,7 +399,7 @@ private fun UniversalHabitRow(habit: Habit, mastery: MasteryInfo?, daysWithout: 
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
-                if (mastery != null && mastery.scheduledDays >= 14) {
+                if (mastery != null && mastery.scheduledDays >= MASTERY_MIN_DISPLAY_DAYS) {
                     if (mastery.isMastered) {
                         Text(
                             stringResource(R.string.habits_mastery_done_badge),

@@ -183,8 +183,9 @@ class HabitRepository(
      * required repetitions) than a daily habit gets over the same stretch,
      * which isn't a fair reading of "90 days of practice". Provided there's been
      * enough opportunity to judge it at all ([MASTERY_MIN_SCHEDULED_DAYS]
-     * scheduled days minimum, so a habit can't be declared "mastered" after 3
-     * lucky days). A Goldilocks difficulty bump ([Habit.difficultyBumpedAtEpochDay])
+     * scheduled days minimum - the full window itself, so "80% of 90" really
+     * does mean 72 real completions across 90 real scheduled days, not 80% of
+     * some much smaller early sample that happens to clear a lower bar). A Goldilocks difficulty bump ([Habit.difficultyBumpedAtEpochDay])
      * restarts this the same way a fresh [Habit.createdAtEpochDay] would.
      *
      * [MasteryInfo.progressPercent] is literally "how many of the completions
@@ -269,9 +270,22 @@ class HabitRepository(
     }
 }
 
-private const val MASTERY_WINDOW_DAYS = 90
+const val MASTERY_WINDOW_DAYS = 90
 private const val MASTERY_THRESHOLD_PERCENT = 80
-private const val MASTERY_MIN_SCHEDULED_DAYS = 14
+// The minimum scheduled-day evidence required before mastery can be declared
+// at all. Deliberately equal to the full window, not some smaller number
+// (like the 14 this used to be) - "80% of 90" has to actually mean 72 real
+// completions out of a real 90-day history, not 80% of a much smaller sample
+// that just happens to clear a lower bar early. A habit that's only 25 days
+// old cannot be "Освоено" yet no matter how perfect its record so far is -
+// see the mastery progress bar for how close it actually is.
+const val MASTERY_MIN_SCHEDULED_DAYS = MASTERY_WINDOW_DAYS
+// A separate, much lower bar - only for whether the UI shows ANY mastery
+// reading at all (a percentage, or the "not enough data yet" hint) instead of
+// nothing. A 3-day-old habit showing "4%" isn't informative, but there's no
+// reason to make it wait a full 90 days just to see a progress number - only
+// the actual "Освоено" verdict needs that much evidence.
+const val MASTERY_MIN_DISPLAY_DAYS = 14
 // Safety bound for walking backward to find 90 *scheduled* days for a habit
 // scheduled very rarely (e.g. once a week needs ~630 calendar days for 90
 // occasions) - generous enough for any realistic weekly pattern, but bounded

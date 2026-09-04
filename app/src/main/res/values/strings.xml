@@ -152,8 +152,8 @@
     <string name="detail_mastery_title">Прогресс освоения</string>
     <string name="detail_mastery_percent">%1$d%%</string>
     <string name="detail_mastery_done">🎓 Освоено</string>
-    <string name="detail_mastery_hint">За последние %1$d запланированных дней — нужно ≥80%%, чтобы привычка считалась освоенной</string>
-    <string name="detail_mastery_hint_not_enough_data">Пока недостаточно данных — нужно хотя бы 14 запланированных дней истории</string>
+    <string name="detail_mastery_hint">За последние %1$d запланированных дней. Чтобы привычка считалась освоенной — нужно ≥80%% из 90 (то есть 72 выполнения)</string>
+    <string name="detail_mastery_hint_not_enough_data">Пока недостаточно данных — нужно хотя бы 14 запланированных дней истории, чтобы увидеть прогресс</string>
     <string name="detail_mastery_hint_manual">Отмечено вручную как «уже освоено» — статистика по дням не считается</string>
 
     <!-- Settings -->
