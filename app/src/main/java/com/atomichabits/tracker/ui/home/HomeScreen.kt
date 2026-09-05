@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
@@ -143,11 +142,18 @@ fun HomeScreen(
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
             item {
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                // A plain Row spread across the full width, not a LazyRow: it's
+                // always exactly 7 fixed items (never scrolls), and a LazyRow
+                // packs them to the left at their intrinsic size - on a wide
+                // screen that leaves a visible empty gap on the right instead
+                // of the strip spanning edge to edge like the rest of the UI.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    items(days) { date ->
+                    days.forEach { date ->
                         val (completed, scheduled) = progressByDate[date] ?: (0 to 0)
                         DateProgressRing(
                             date = date,

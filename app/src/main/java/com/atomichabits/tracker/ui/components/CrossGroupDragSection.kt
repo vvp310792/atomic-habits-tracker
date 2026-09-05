@@ -200,6 +200,26 @@ fun <T> CrossGroupDraggableSections(
                                                         cumulativeTop = itemBottom + spacerPx
                                                     }
                                                     if (targetIndex != currentIndex) {
+                                                        // Reordering shifts the dragged item's own slot in the
+                                                        // Column - e.g. moving it past 2 items down means Compose
+                                                        // now lays it out ~2 items further down, on top of the
+                                                        // visual dragOffsetY already applied. Uncompensated, that's
+                                                        // a double shift each step: the card overshoots the finger
+                                                        // and visibly overlaps/jumps past the row it should land
+                                                        // on. Subtract (moving down) or add back (moving up) the
+                                                        // real height of every item it swapped past, so the
+                                                        // dragged card's on-screen position stays continuous
+                                                        // across the reorder instead of jumping.
+                                                        val lo = minOf(currentIndex, targetIndex)
+                                                        val hi = maxOf(currentIndex, targetIndex)
+                                                        var passedDistance = 0f
+                                                        for (idx in lo..hi) {
+                                                            if (idx == currentIndex) continue
+                                                            val h = itemHeights[itemKey(g.items[idx])] ?: fallbackRowHeightPx
+                                                            passedDistance += h + spacerPx
+                                                        }
+                                                        dragOffsetY += if (targetIndex > currentIndex) -passedDistance else passedDistance
+
                                                         val newItems = g.items.toMutableList().apply {
                                                             add(targetIndex, removeAt(currentIndex))
                                                         }

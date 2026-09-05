@@ -3,6 +3,7 @@ package com.atomichabits.tracker.ui.history
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -333,51 +334,73 @@ private fun MonthCalendar(
                 }
             }
             Spacer(Modifier.size(8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            // Weekday header and the day grid below MUST divide the card's
+            // width into 7 columns the exact same way, or the two visibly
+            // drift apart - which is what happened here: this header split
+            // the row via SpaceBetween + a fixed 32dp Text width, while the
+            // day grid below was a LazyVerticalGrid(Fixed(7)) that divides
+            // the SAME width into 7 EQUAL columns automatically. Those are
+            // two different column maths, so the wider the screen, the more
+            // the two disagree - each day circle (a fixed 38dp box) then sits
+            // left-aligned in a column noticeably wider than 38dp, showing as
+            // empty space to its right and drift versus the header above.
+            // Both now use the identical weight(1f)-per-column split, which
+            // stays aligned at any screen width.
+            Row(modifier = Modifier.fillMaxWidth()) {
                 listOf("ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС").forEach {
                     Text(
                         it,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                        modifier = Modifier.width(32.dp),
+                        modifier = Modifier.weight(1f),
                         textAlign = TextAlign.Center
                     )
                 }
             }
             Spacer(Modifier.size(4.dp))
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(7),
-                modifier = Modifier.height((((leadingBlanks + daysInMonth + 6) / 7) * 42).dp)
-            ) {
-                items(leadingBlanks) { Box(Modifier.size(32.dp)) }
-                items(daysInMonth) { dayIndex ->
-                    val date = visibleMonth.atDay(dayIndex + 1)
-                    val isToday = date == today
-                    val completedCount = completedByDate[date.toEpochDay()]?.size ?: 0
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .padding(3.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
+            // A plain grid of Rows, not LazyVerticalGrid: a month is at most
+            // 6 weeks, far too small to need lazy virtualization, and a plain
+            // Column sizes itself to its content instead of needing a
+            // precomputed pixel height (the previous "(rows * 42).dp" guess,
+            // itself a source of drift the moment a cell's true height
+            // differed from that assumption).
+            val totalCells = leadingBlanks + daysInMonth
+            val weeksInMonth = (totalCells + 6) / 7
+            for (week in 0 until weeksInMonth) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    for (col in 0 until 7) {
+                        val dayNumber = week * 7 + col - leadingBlanks + 1
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
-                                .background(
-                                    when {
-                                        isToday -> MaterialTheme.colorScheme.primary
-                                        completedCount > 0 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                        else -> Color.Transparent
-                                    },
-                                    CircleShape
-                                ),
+                                .weight(1f)
+                                .aspectRatio(1f)
+                                .padding(3.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                (dayIndex + 1).toString(),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (isToday) Color.White else MaterialTheme.colorScheme.onSurface
-                            )
+                            if (dayNumber in 1..daysInMonth) {
+                                val date = visibleMonth.atDay(dayNumber)
+                                val isToday = date == today
+                                val completedCount = completedByDate[date.toEpochDay()]?.size ?: 0
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            when {
+                                                isToday -> MaterialTheme.colorScheme.primary
+                                                completedCount > 0 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                else -> Color.Transparent
+                                            },
+                                            CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        dayNumber.toString(),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (isToday) Color.White else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
                         }
                     }
                 }

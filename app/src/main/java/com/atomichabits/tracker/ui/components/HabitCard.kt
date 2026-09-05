@@ -81,8 +81,16 @@ fun HabitCard(
         }
 
         Card(
+            // weight(1f), not fillMaxWidth(): inside a Row, an unweighted
+            // fillMaxWidth() child sizes itself to the ROW's full incoming
+            // width regardless of its siblings (a well-known Compose gotcha),
+            // so this card was requesting the entire row width in addition to
+            // the checkbox+spacing before it - overflowing past the visible
+            // edge by that amount on every row. weight(1f) makes it correctly
+            // take only the space left after the fixed-size checkbox, exactly
+            // like UniversalHabitRow's Column does in HabitsListScreen.kt.
             modifier = Modifier
-                .fillMaxWidth()
+                .weight(1f)
                 .clickable { onClick() },
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = accent)
