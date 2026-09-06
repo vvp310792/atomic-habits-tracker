@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -130,6 +132,7 @@ fun HabitsListScreen(
                     onAdd = { onAddHabit("USEFUL", true) },
                     onMove = { habit, toTime -> app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
                     onReorder = { orderedItems -> app.launchPersistent { app.repository.reorder(orderedItems.map { it.id }) } },
+                    onReorderChain = { newOrder -> app.launchPersistent { app.repository.reorderChain(newOrder) } },
                     onClick = ::rowClick
                 )
                 Spacer(Modifier.size(20.dp))
@@ -144,6 +147,7 @@ fun HabitsListScreen(
                     onAdd = { onAddHabit("DESIRED", false) },
                     onMove = { habit, toTime -> app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
                     onReorder = { orderedItems -> app.launchPersistent { app.repository.reorder(orderedItems.map { it.id }) } },
+                    onReorderChain = { newOrder -> app.launchPersistent { app.repository.reorderChain(newOrder) } },
                     onClick = ::rowClick
                 )
                 Spacer(Modifier.size(20.dp))
@@ -159,6 +163,7 @@ fun HabitsListScreen(
                     onAdd = { onAddHabit("HARMFUL", false) },
                     onMove = { habit, toTime -> app.launchPersistent { app.repository.saveHabit(habit.copy(timeOfDay = toTime)) } },
                     onReorder = { orderedItems -> app.launchPersistent { app.repository.reorder(orderedItems.map { it.id }) } },
+                    onReorderChain = { newOrder -> app.launchPersistent { app.repository.reorderChain(newOrder) } },
                     onClick = ::rowClick
                 )
             }
@@ -226,6 +231,7 @@ private fun ColoredQualitySection(
     onAdd: () -> Unit,
     onMove: (Habit, String) -> Unit,
     onReorder: (List<Habit>) -> Unit,
+    onReorderChain: (List<Habit>) -> Unit,
     onClick: (Habit) -> Unit
 ) {
     Card(
@@ -267,7 +273,7 @@ private fun ColoredQualitySection(
                     onReorder = { _, orderedChains -> onReorder(orderedChains.flatMap { it.habits }) },
                     emptyGroupHint = stringResource(R.string.home_group_empty_hint)
                 ) { chain, isDragging ->
-                    HabitChainBlock(chain, masteryByHabit, daysWithoutByHabit, pausedHabitSyncIds, isDragging, onClick)
+                    HabitChainBlock(chain, masteryByHabit, daysWithoutByHabit, pausedHabitSyncIds, isDragging, onClick, onReorderChain)
                 }
             }
         }
@@ -279,6 +285,15 @@ private fun ColoredQualitySection(
  * nested slightly and preceded by a small "↳" connector, so a stacked sequence reads
  * as one conveyor at a glance instead of disconnected rows. A chain of length 1 looks
  * exactly like a plain habit row (no connector, no indent).
+ *
+ * Chains longer than one link also get a small up/down control per row, so a
+ * link can be moved earlier/later relative to its neighbours (swap it with
+ * whoever comes right before/after) without opening that habit's editor and
+ * re-picking its stack anchor by hand - see [HabitRepository.reorderChain].
+ * This is deliberately a pair of buttons, not a second drag gesture nested
+ * inside the chain: [CrossGroupDraggableSections] already owns long-press
+ * drag at the chain (root) level for moving a whole chain, and a second,
+ * inner drag zone would be ambiguous to tell apart from that outer one.
  */
 @Composable
 private fun HabitChainBlock(
@@ -287,14 +302,14 @@ private fun HabitChainBlock(
     daysWithoutByHabit: Map<String, DaysWithoutInfo>,
     pausedHabitSyncIds: Set<String>,
     isDragging: Boolean,
-    onClick: (Habit) -> Unit
+    onClick: (Habit) -> Unit,
+    onReorderChain: (List<Habit>) -> Unit
 ) {
+    val canReorder = chain.habits.size > 1
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         chain.habits.forEachIndexed { index, habit ->
-            if (index == 0) {
-                UniversalHabitRow(habit, masteryByHabit[habit.syncId], daysWithoutByHabit[habit.syncId], habit.syncId in pausedHabitSyncIds) { onClick(habit) }
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (index > 0) {
                     Spacer(Modifier.size(20.dp))
                     Text(
                         "\u21B3",
@@ -302,11 +317,64 @@ private fun HabitChainBlock(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                         modifier = Modifier.padding(end = 4.dp)
                     )
-                    Box(modifier = Modifier.weight(1f)) {
-                        UniversalHabitRow(habit, masteryByHabit[habit.syncId], daysWithoutByHabit[habit.syncId], habit.syncId in pausedHabitSyncIds) { onClick(habit) }
-                    }
+                }
+                Box(modifier = Modifier.weight(1f)) {
+                    UniversalHabitRow(habit, masteryByHabit[habit.syncId], daysWithoutByHabit[habit.syncId], habit.syncId in pausedHabitSyncIds) { onClick(habit) }
+                }
+                if (canReorder) {
+                    ChainReorderControls(
+                        canMoveUp = index > 0,
+                        canMoveDown = index < chain.habits.lastIndex,
+                        onMoveUp = { onReorderChain(swappedChainOrder(chain.habits, index, -1)) },
+                        onMoveDown = { onReorderChain(swappedChainOrder(chain.habits, index, 1)) }
+                    )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Swaps the habit at [index] with its neighbour [delta] positions away (must
+ * be +1 or -1) within [order]; returns [order] unchanged if that neighbour is
+ * out of range (e.g. moving the first link further up). The result still holds
+ * exactly the same habits as [order], just reordered - [HabitRepository.reorderChain]
+ * turns that new order into the actual stackAnchorId links.
+ */
+private fun swappedChainOrder(order: List<Habit>, index: Int, delta: Int): List<Habit> {
+    val target = index + delta
+    if (target !in order.indices) return order
+    return order.toMutableList().apply {
+        val tmp = this[index]
+        this[index] = this[target]
+        this[target] = tmp
+    }
+}
+
+@Composable
+private fun ChainReorderControls(canMoveUp: Boolean, canMoveDown: Boolean, onMoveUp: () -> Unit, onMoveDown: () -> Unit) {
+    // IconButton keeps its default ~48dp touch target here (only the glyph
+    // is shrunk) - a smaller tap area would be an easy mis-tap sitting right
+    // next to the row's own larger click target, exactly the kind of small
+    // touch target that's hard to hit reliably on a phone.
+    Column {
+        IconButton(onClick = onMoveUp, enabled = canMoveUp) {
+            Icon(
+                Icons.Filled.KeyboardArrowUp,
+                contentDescription = stringResource(R.string.chain_move_up),
+                modifier = Modifier.size(18.dp),
+                tint = if (canMoveUp) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+            )
+        }
+        IconButton(onClick = onMoveDown, enabled = canMoveDown) {
+            Icon(
+                Icons.Filled.KeyboardArrowDown,
+                contentDescription = stringResource(R.string.chain_move_down),
+                modifier = Modifier.size(18.dp),
+                tint = if (canMoveDown) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+            )
         }
     }
 }

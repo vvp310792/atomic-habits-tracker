@@ -52,6 +52,31 @@ class HabitRepository(
         }
     }
 
+    /**
+     * Re-points every member of a habit-stacking chain's [Habit.stackAnchorId]
+     * to whoever now precedes it in [newOrder] (blank for the new first item,
+     * which becomes the chain's root) - the persistence side of letting a
+     * user reorder or swap links within an already-built chain (move a habit
+     * earlier/later relative to the others) instead of only being able to set
+     * one habit's anchor at a time via the create/edit picker. [newOrder]
+     * must be the same set of habits as the existing chain, just reordered -
+     * this never attaches an outside habit or changes chain membership.
+     */
+    suspend fun reorderChain(newOrder: List<Habit>) {
+        newOrder.forEachIndexed { index, habit ->
+            val newAnchorId = if (index == 0) "" else newOrder[index - 1].syncId
+            if (habit.stackAnchorId == newAnchorId) return@forEachIndexed
+            val newAnchorLabel = if (index == 0) "" else newOrder[index - 1].name
+            saveHabit(
+                habit.copy(
+                    stackAnchorId = newAnchorId,
+                    stackAnchorType = if (newAnchorId.isBlank()) "" else "HABIT",
+                    stackAnchorLabel = newAnchorLabel
+                )
+            )
+        }
+    }
+
     suspend fun deleteHabit(habit: Habit) = habitDao.delete(habit)
 
     /**

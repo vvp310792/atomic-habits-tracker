@@ -103,6 +103,8 @@
     <string name="stack_picker_none">Не привязывать</string>
     <string name="stack_picker_habits">Мои привычки</string>
     <string name="stack_picker_empty">Пока нет ни привычек, ни опор — добавьте в библиотеке</string>
+    <string name="chain_move_up">Переставить раньше в цепочке</string>
+    <string name="chain_move_down">Переставить позже в цепочке</string>
 
     <!-- Anchor habit library -->
     <string name="anchors_title">Библиотека привычек</string>
