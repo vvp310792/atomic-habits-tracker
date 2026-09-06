@@ -78,6 +78,8 @@ fun HomeScreen(
     val days = remember(weekMonday) { (0..6).map { weekMonday.plusDays(it.toLong()) } }
 
     val windowLogs by app.repository.observeLogsBetween(weekMonday, weekSunday).collectAsState(initial = emptyList())
+    val allLogs by app.repository.observeAllLogs().collectAsState(initial = emptyList())
+    val pausePeriods by app.pausePeriodRepository.observeAll().collectAsState(initial = emptyList())
 
     var selectedDate by remember { mutableStateOf(today) }
     var filter by remember { mutableStateOf("ALL") }
@@ -98,6 +100,22 @@ fun HomeScreen(
     val completedIdsForSelectedDate = remember(windowLogs, selectedDate) {
         windowLogs.filter { it.dateEpochDay == selectedDate.toEpochDay() && it.completed }
             .map { it.habitId }.toSet()
+    }
+
+    // Current streak per habit, computed ONCE for the whole screen from data
+    // already being observed (same pattern as HabitsListScreen's masteryByHabit).
+    // Previously each HabitCard fetched and recomputed this itself via its own
+    // suspend DB round-trip (plus a full computeStats, most of which was thrown
+    // away) - N habits meant N sequential queries every single time this screen
+    // was opened, which was the actual cause of a multi-second delay.
+    val currentStreakByHabit = remember(trackedHabits, allLogs, pausePeriods) {
+        val doneEpochDaysByHabitId = allLogs
+            .filter { it.completed }
+            .groupBy({ it.habitId }, { it.dateEpochDay })
+            .mapValues { it.value.toSet() }
+        trackedHabits.associate { h ->
+            h.id to app.repository.computeCurrentStreak(h, doneEpochDaysByHabitId[h.id].orEmpty(), pausePeriods)
+        }
     }
 
     val timeGroups = TIME_OF_DAY_VALUES.map { tod ->
@@ -209,8 +227,7 @@ fun HomeScreen(
                         HabitCard(
                             habit = habit,
                             completedToday = habit.id in completedIdsForSelectedDate,
-                            repository = app.repository,
-                            refreshKey = habit.id in completedIdsForSelectedDate,
+                            currentStreak = currentStreakByHabit[habit.id] ?: 0,
                             onToggle = habitToggle(habit),
                             onClick = { onOpenHabit(habit.id) }
                         )

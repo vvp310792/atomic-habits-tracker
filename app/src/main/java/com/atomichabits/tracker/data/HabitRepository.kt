@@ -137,20 +137,7 @@ class HabitRepository(
         val completedDays = logs.filter { it.completed }.map { it.dateEpochDay }.toSet()
         val pausePeriods = pausePeriodDao?.getAllOnce().orEmpty()
 
-        var current = 0
-        var cursor = LocalDate.now()
-        while (true) {
-            if (!isActiveOn(habit, cursor, pausePeriods)) {
-                cursor = cursor.minusDays(1)
-                continue
-            }
-            if (completedDays.contains(cursor.toEpochDay())) {
-                current++
-                cursor = cursor.minusDays(1)
-            } else {
-                break
-            }
-        }
+        val current = computeCurrentStreak(habit, completedDays, pausePeriods)
 
         var best = 0
         var running = 0
@@ -236,6 +223,47 @@ class HabitRepository(
      * non-scheduled day-of-week, so it counts toward neither the target nor
      * actual performance (see PausePeriod.kt).
      */
+    /**
+     * Current streak only, as a plain (non-suspend) function over data the
+     * caller already has - same [computeMastery]-style reasoning: a UI layer
+     * showing this for a whole list of habits (e.g. the Today screen's habit
+     * cards) shouldn't need a separate suspend DB round-trip PLUS a full
+     * [computeStats] (best streak + 30-day rate + mastery) per row just to
+     * read one int - that was previously happening once per card, per visit
+     * to the screen, and was the actual cause of a multi-second delay opening
+     * it with more than a few habits. [computeStats] itself now delegates
+     * here instead of duplicating the loop.
+     *
+     * Bounded to [maxIterations] calendar days so a habit with no active days
+     * at all (`activeDays == 0`, if that's ever reachable) can't spin this
+     * loop forever - the same guard [HistoryScreen]'s own streak computation
+     * already uses, just missing here until now.
+     */
+    fun computeCurrentStreak(
+        habit: Habit,
+        completedEpochDays: Set<Long>,
+        pausePeriods: List<PausePeriod> = emptyList(),
+        maxIterations: Int = 3660
+    ): Int {
+        var current = 0
+        var cursor = LocalDate.now()
+        var guard = 0
+        while (guard < maxIterations) {
+            guard++
+            if (!isActiveOn(habit, cursor, pausePeriods)) {
+                cursor = cursor.minusDays(1)
+                continue
+            }
+            if (completedEpochDays.contains(cursor.toEpochDay())) {
+                current++
+                cursor = cursor.minusDays(1)
+            } else {
+                break
+            }
+        }
+        return current
+    }
+
     fun computeMastery(
         habit: Habit,
         completedEpochDays: Set<Long>,
