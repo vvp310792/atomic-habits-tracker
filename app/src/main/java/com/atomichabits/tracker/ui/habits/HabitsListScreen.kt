@@ -17,8 +17,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,6 +46,8 @@ import com.atomichabits.tracker.data.computeJournalDaysWithout
 import com.atomichabits.tracker.ui.components.CategoryTag
 import com.atomichabits.tracker.ui.components.CrossGroupDraggableSections
 import com.atomichabits.tracker.ui.components.DragGroup
+import com.atomichabits.tracker.ui.components.ReorderArrowControls
+import com.atomichabits.tracker.ui.components.swappedOrder
 import com.atomichabits.tracker.util.TIME_OF_DAY_VALUES
 import com.atomichabits.tracker.util.declineDays
 import com.atomichabits.tracker.util.timeOfDayLabel
@@ -322,59 +322,14 @@ private fun HabitChainBlock(
                     UniversalHabitRow(habit, masteryByHabit[habit.syncId], daysWithoutByHabit[habit.syncId], habit.syncId in pausedHabitSyncIds) { onClick(habit) }
                 }
                 if (canReorder) {
-                    ChainReorderControls(
+                    ReorderArrowControls(
                         canMoveUp = index > 0,
                         canMoveDown = index < chain.habits.lastIndex,
-                        onMoveUp = { onReorderChain(swappedChainOrder(chain.habits, index, -1)) },
-                        onMoveDown = { onReorderChain(swappedChainOrder(chain.habits, index, 1)) }
+                        onMoveUp = { onReorderChain(swappedOrder(chain.habits, index, -1)) },
+                        onMoveDown = { onReorderChain(swappedOrder(chain.habits, index, 1)) }
                     )
                 }
             }
-        }
-    }
-}
-
-/**
- * Swaps the habit at [index] with its neighbour [delta] positions away (must
- * be +1 or -1) within [order]; returns [order] unchanged if that neighbour is
- * out of range (e.g. moving the first link further up). The result still holds
- * exactly the same habits as [order], just reordered - [HabitRepository.reorderChain]
- * turns that new order into the actual stackAnchorId links.
- */
-private fun swappedChainOrder(order: List<Habit>, index: Int, delta: Int): List<Habit> {
-    val target = index + delta
-    if (target !in order.indices) return order
-    return order.toMutableList().apply {
-        val tmp = this[index]
-        this[index] = this[target]
-        this[target] = tmp
-    }
-}
-
-@Composable
-private fun ChainReorderControls(canMoveUp: Boolean, canMoveDown: Boolean, onMoveUp: () -> Unit, onMoveDown: () -> Unit) {
-    // IconButton keeps its default ~48dp touch target here (only the glyph
-    // is shrunk) - a smaller tap area would be an easy mis-tap sitting right
-    // next to the row's own larger click target, exactly the kind of small
-    // touch target that's hard to hit reliably on a phone.
-    Column {
-        IconButton(onClick = onMoveUp, enabled = canMoveUp) {
-            Icon(
-                Icons.Filled.KeyboardArrowUp,
-                contentDescription = stringResource(R.string.chain_move_up),
-                modifier = Modifier.size(18.dp),
-                tint = if (canMoveUp) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
-            )
-        }
-        IconButton(onClick = onMoveDown, enabled = canMoveDown) {
-            Icon(
-                Icons.Filled.KeyboardArrowDown,
-                contentDescription = stringResource(R.string.chain_move_down),
-                modifier = Modifier.size(18.dp),
-                tint = if (canMoveDown) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
-            )
         }
     }
 }

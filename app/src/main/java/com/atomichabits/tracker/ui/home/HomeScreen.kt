@@ -43,6 +43,8 @@ import com.atomichabits.tracker.ui.components.CrossGroupDraggableSections
 import com.atomichabits.tracker.ui.components.DateProgressRing
 import com.atomichabits.tracker.ui.components.DragGroup
 import com.atomichabits.tracker.ui.components.HabitCard
+import com.atomichabits.tracker.ui.components.ReorderArrowControls
+import com.atomichabits.tracker.ui.components.swappedOrder
 import com.atomichabits.tracker.util.TIME_OF_DAY_VALUES
 import com.atomichabits.tracker.util.declineDays
 import com.atomichabits.tracker.util.isHabitScheduledOn
@@ -223,14 +225,47 @@ fun HomeScreen(
                     },
                     emptyGroupHint = stringResource(R.string.home_group_empty_hint)
                 ) { habit, isDragging ->
+                    // Same swap-with-neighbour arrows as the Habits screen's
+                    // chain links (see ReorderControls.kt) - an alternative to
+                    // long-press drag for reordering within one time-of-day
+                    // group, for anyone who finds landing a drag gesture
+                    // fiddly. The group here is recomputed from data this
+                    // screen already has (habitsForSelectedDate filtered to
+                    // this habit's own timeOfDay), not from visibleTimeGroups,
+                    // since the filter chips only hide whole groups from view -
+                    // they don't change which habits actually belong together.
+                    val groupHabits = remember(habitsForSelectedDate, habit.timeOfDay) {
+                        habitsForSelectedDate.filter { it.timeOfDay == habit.timeOfDay }
+                    }
+                    val indexInGroup = groupHabits.indexOfFirst { it.id == habit.id }
                     Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
-                        HabitCard(
-                            habit = habit,
-                            completedToday = habit.id in completedIdsForSelectedDate,
-                            currentStreak = currentStreakByHabit[habit.id] ?: 0,
-                            onToggle = habitToggle(habit),
-                            onClick = { onOpenHabit(habit.id) }
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                HabitCard(
+                                    habit = habit,
+                                    completedToday = habit.id in completedIdsForSelectedDate,
+                                    currentStreak = currentStreakByHabit[habit.id] ?: 0,
+                                    onToggle = habitToggle(habit),
+                                    onClick = { onOpenHabit(habit.id) }
+                                )
+                            }
+                            if (groupHabits.size > 1) {
+                                ReorderArrowControls(
+                                    canMoveUp = indexInGroup > 0,
+                                    canMoveDown = indexInGroup in 0 until groupHabits.lastIndex,
+                                    onMoveUp = {
+                                        app.launchPersistent {
+                                            app.repository.reorder(swappedOrder(groupHabits, indexInGroup, -1).map { it.id })
+                                        }
+                                    },
+                                    onMoveDown = {
+                                        app.launchPersistent {
+                                            app.repository.reorder(swappedOrder(groupHabits, indexInGroup, 1).map { it.id })
+                                        }
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }
