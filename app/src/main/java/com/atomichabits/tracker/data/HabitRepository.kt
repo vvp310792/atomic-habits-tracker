@@ -267,9 +267,15 @@ class HabitRepository(
     fun computeMastery(
         habit: Habit,
         completedEpochDays: Set<Long>,
-        pausePeriods: List<PausePeriod> = emptyList()
+        pausePeriods: List<PausePeriod> = emptyList(),
+        asOf: LocalDate = LocalDate.now()
     ): MasteryInfo {
-        val today = LocalDate.now()
+        // [asOf] lets a caller ask "was this habit mastered as of some PAST
+        // date", not just today - e.g. History's mastery-dynamics chart,
+        // which recomputes this same windowed formula at several past dates
+        // to plot a trend, rather than only ever reading the current snapshot.
+        // Defaults to today so every existing call site is unaffected.
+        val today = asOf
 
         // Walk backward from today collecting only *scheduled* days until we
         // have MASTERY_WINDOW_DAYS of them (or hit the sanity cap, for a habit

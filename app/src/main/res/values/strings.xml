@@ -39,6 +39,9 @@
     <string name="history_impulse_chart_no_habits">Нет отслеживаемых вредных привычек</string>
     <string name="history_impulse_legend_check">Удержался</string>
     <string name="history_impulse_legend_cross">Поддался</string>
+    <string name="history_mastery_trend_title">Динамика освоения</string>
+    <string name="history_mastery_trend_subtitle">Освоено сейчас: %1$d из %2$d</string>
+    <string name="history_mastery_trend_no_habits">Нет отслеживаемых привычек</string>
 
     <string name="journal_title">Дневник</string>
     <string name="journal_no_habits">Нет отслеживаемых вредных привычек — добавь или включи отслеживание в «Привычках»</string>

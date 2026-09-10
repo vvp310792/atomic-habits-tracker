@@ -52,6 +52,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +63,8 @@ import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.Habit
 import com.atomichabits.tracker.data.HabitJournalEntry
 import com.atomichabits.tracker.data.HabitLog
+import com.atomichabits.tracker.data.MasteryInfo
+import com.atomichabits.tracker.data.PausePeriod
 import com.atomichabits.tracker.util.isHabitScheduledOn
 import java.time.LocalDate
 import java.time.YearMonth
@@ -75,12 +78,20 @@ fun HistoryScreen(app: HabitTrackerApp, onOpenHabit: (Long) -> Unit) {
     val trackedHarmfulHabits = remember(habits) { habits.filter { it.isTracked && it.qualityType == "HARMFUL" } }
     val allLogs by app.repository.observeAllLogs().collectAsState(initial = emptyList())
     val journalEntries by app.journalRepository.observeAll().collectAsState(initial = emptyList())
+    val pausePeriods by app.pausePeriodRepository.observeAll().collectAsState(initial = emptyList())
     val today = remember { LocalDate.now() }
 
     var tabIndex by remember { mutableIntStateOf(0) }
     var visibleMonth by remember { mutableStateOf(YearMonth.from(today)) }
 
     val stats = remember(trackedHabits, allLogs) { computeHistoryStats(trackedHabits, allLogs, today) }
+    // "Сводная динамика по статистике освоения" - % of tracked habits mastered,
+    // recomputed at several PAST reference dates (not just today) via
+    // HabitRepository.computeMastery's asOf parameter, so this reads as an
+    // actual trend rather than one static snapshot.
+    val masteryTrend = remember(trackedHabits, allLogs, pausePeriods, today) {
+        computeMasteryTrend(trackedHabits, allLogs, pausePeriods, today, app.repository::computeMastery)
+    }
 
     Scaffold(
         topBar = {
@@ -102,6 +113,7 @@ fun HistoryScreen(app: HabitTrackerApp, onOpenHabit: (Long) -> Unit) {
                     journalEntries = journalEntries,
                     harmfulHabits = trackedHarmfulHabits,
                     stats = stats,
+                    masteryTrend = masteryTrend,
                     today = today,
                     visibleMonth = visibleMonth,
                     onMonthChange = { visibleMonth = it }
@@ -215,6 +227,7 @@ private fun CalendarTab(
     journalEntries: List<HabitJournalEntry>,
     harmfulHabits: List<Habit>,
     stats: HistoryStats,
+    masteryTrend: List<MasteryTrendPoint>,
     today: LocalDate,
     visibleMonth: YearMonth,
     onMonthChange: (YearMonth) -> Unit
@@ -269,6 +282,11 @@ private fun CalendarTab(
 
         item {
             ImpulseTrendChart(habits = harmfulHabits, entries = journalEntries, today = today)
+            Spacer(Modifier.size(20.dp))
+        }
+
+        item {
+            MasteryTrendChart(masteryTrend)
             Spacer(Modifier.size(20.dp))
         }
 
@@ -539,6 +557,127 @@ private fun ImpulseLegendDot(color: Color, label: String) {
         Box(modifier = Modifier.size(10.dp).background(color, CircleShape))
         Spacer(Modifier.size(4.dp))
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+    }
+}
+
+// endregion
+
+// region ---- Mastery dynamics chart ----
+
+private const val MASTERY_TREND_MONTHS = 6
+
+/** One point on the mastery-dynamics trend: how many of the habits that already existed by [date] counted as mastered as of that date. */
+private data class MasteryTrendPoint(val date: LocalDate, val masteredCount: Int, val totalCount: Int) {
+    val percent: Int get() = if (totalCount == 0) 0 else (masteredCount * 100 / totalCount)
+}
+
+/**
+ * Recomputes "% of tracked habits mastered" at [MASTERY_TREND_MONTHS] past
+ * reference points (today and one point per month before it) instead of only
+ * reading today's snapshot - the actual "dynamics" the mastery badges
+ * elsewhere in the app don't show, since they only ever read the current
+ * moment. Reuses [HabitRepository.computeMastery] itself via its [asOf]
+ * parameter for each historical point, rather than a separate formula - the
+ * exact same 90-scheduled-day/80% rule just asked "as of this past date"
+ * instead of "as of today".
+ *
+ * A habit only enters a given point's totals once it actually existed
+ * ([Habit.createdAtEpochDay] <= that point) - same convention already used
+ * by [computeHistoryStats]/[weeklyBuckets] above for the same reason: you
+ * can't judge whether a habit was mastered before it existed.
+ * [Habit.manuallyMastered] is applied uniformly to every point (it carries no
+ * timestamp of when it became true, so there's no way to know it *wasn't*
+ * true a few months ago either - and a habit honest enough to self-declare
+ * "already automatic" almost always was, months back, too).
+ */
+private fun computeMasteryTrend(
+    trackedHabits: List<Habit>,
+    allLogs: List<HabitLog>,
+    pausePeriods: List<PausePeriod>,
+    today: LocalDate,
+    computeMastery: (Habit, Set<Long>, List<PausePeriod>, LocalDate) -> MasteryInfo,
+    months: Int = MASTERY_TREND_MONTHS
+): List<MasteryTrendPoint> {
+    val doneEpochDaysByHabitId = allLogs.filter { it.completed }
+        .groupBy({ it.habitId }, { it.dateEpochDay })
+        .mapValues { it.value.toSet() }
+    return (0 until months).map { i ->
+        val pointDate = today.minusMonths((months - 1 - i).toLong())
+        val habitsAtPoint = trackedHabits.filter { it.createdAtEpochDay <= pointDate.toEpochDay() }
+        val masteredCount = habitsAtPoint.count { h ->
+            h.manuallyMastered || computeMastery(h, doneEpochDaysByHabitId[h.id].orEmpty(), pausePeriods, pointDate).isMastered
+        }
+        MasteryTrendPoint(pointDate, masteredCount, habitsAtPoint.size)
+    }
+}
+
+@Composable
+private fun MasteryTrendChart(trend: List<MasteryTrendPoint>) {
+    val lineColor = MaterialTheme.colorScheme.primary
+    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+    val latest = trend.lastOrNull()
+    val hasAnyHabits = latest != null && latest.totalCount > 0
+
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    stringResource(R.string.history_mastery_trend_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                if (hasAnyHabits) {
+                    Text("${latest!!.percent}%", style = MaterialTheme.typography.titleMedium, color = lineColor)
+                }
+            }
+            Text(
+                if (!hasAnyHabits) stringResource(R.string.history_mastery_trend_no_habits)
+                else stringResource(R.string.history_mastery_trend_subtitle, latest!!.masteredCount, latest.totalCount),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+
+            if (hasAnyHabits && trend.size >= 2) {
+                Spacer(Modifier.size(12.dp))
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                ) {
+                    val stepX = size.width / (trend.size - 1)
+                    fun yFor(percent: Int): Float = size.height - (percent / 100f) * size.height
+
+                    drawLine(
+                        color = trackColor,
+                        start = Offset(0f, size.height),
+                        end = Offset(size.width, size.height),
+                        strokeWidth = 2.dp.toPx()
+                    )
+
+                    val points = trend.mapIndexed { idx, p -> Offset(idx * stepX, yFor(p.percent)) }
+                    for (i in 0 until points.size - 1) {
+                        drawLine(
+                            color = lineColor,
+                            start = points[i],
+                            end = points[i + 1],
+                            strokeWidth = 3.dp.toPx(),
+                            cap = StrokeCap.Round
+                        )
+                    }
+                    points.forEach { p -> drawCircle(color = lineColor, radius = 4.dp.toPx(), center = p) }
+                }
+                Spacer(Modifier.size(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    trend.forEach { p ->
+                        Text(
+                            monthShort(p.date.monthValue),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
