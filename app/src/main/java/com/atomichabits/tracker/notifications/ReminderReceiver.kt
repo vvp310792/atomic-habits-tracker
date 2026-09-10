@@ -3,7 +3,6 @@ package com.atomichabits.tracker.notifications
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import androidx.core.app.NotificationManagerCompat
 import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.data.isHabitPausedOn
 import kotlinx.coroutines.CoroutineScope
@@ -53,7 +52,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     }
                     ACTION_MARK_DONE -> {
                         app.repository.toggleCompletion(habitId, LocalDate.now())
-                        NotificationManagerCompat.from(context).cancel(habitId.toInt())
+                        NotificationHelper.dismiss(context, habitId)
                     }
                 }
             } finally {

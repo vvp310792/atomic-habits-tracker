@@ -67,5 +67,19 @@ object NotificationHelper {
         }
     }
 
+    /**
+     * Dismisses a habit's reminder notification if one is currently showing -
+     * the notification ID is always habitId.toInt() (see [showReminder]), so
+     * this is a plain cancel by that same ID. Used both when the notification's
+     * own "Готово" action marks the habit done, and when the habit is checked
+     * off from inside the app itself (the checkbox on the Today screen)
+     * while that reminder happens to still be sitting in the tray - it should
+     * disappear the moment the habit is actually done, not linger until
+     * manually swiped away.
+     */
+    fun dismiss(context: Context, habitId: Long) {
+        NotificationManagerCompat.from(context).cancel(habitId.toInt())
+    }
+
     const val EXTRA_HABIT_ID = "extra_habit_id"
 }

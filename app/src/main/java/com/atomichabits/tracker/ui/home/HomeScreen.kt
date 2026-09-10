@@ -39,6 +39,7 @@ import com.atomichabits.tracker.HabitTrackerApp
 import com.atomichabits.tracker.R
 import com.atomichabits.tracker.data.Habit
 import com.atomichabits.tracker.data.computeJournalDaysWithout
+import com.atomichabits.tracker.notifications.NotificationHelper
 import com.atomichabits.tracker.ui.components.CrossGroupDraggableSections
 import com.atomichabits.tracker.ui.components.DateProgressRing
 import com.atomichabits.tracker.ui.components.DragGroup
@@ -140,7 +141,20 @@ fun HomeScreen(
     }
 
     fun habitToggle(habit: Habit): () -> Unit = {
-        app.launchPersistent { app.repository.toggleCompletion(habit.id, selectedDate) }
+        app.launchPersistent {
+            val nowCompleted = app.repository.toggleCompletion(habit.id, selectedDate)
+            // A reminder notification for this habit may still be sitting in
+            // the tray from earlier today (B=MAP notification-gating already
+            // stops a NEW one firing once it's done, but doesn't touch one
+            // that already fired) - checking it off here, in the app itself,
+            // should make it disappear immediately, not linger until swiped
+            // away by hand. Only relevant for today: a notification is only
+            // ever shown for the day its alarm actually fired on, so marking
+            // a past/future day done here has nothing to dismiss.
+            if (nowCompleted && selectedDate == today) {
+                NotificationHelper.dismiss(app, habit.id)
+            }
+        }
     }
 
     Scaffold(
