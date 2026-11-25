@@ -193,11 +193,34 @@ fun SettingsScreen(app: HabitTrackerApp, onBack: (() -> Unit)? = null, onOpenSco
                 Text(stringResource(R.string.settings_account_section), style = MaterialTheme.typography.titleMedium)
 
                 if (currentUserEmail != null) {
+                    val sync by app.syncManager.status.collectAsState()
                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                         Text(
                             "\u2705 " + stringResource(R.string.settings_account_signed_in, currentUserEmail!!),
                             modifier = Modifier.padding(16.dp)
                         )
+                    }
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Синхронизация с облаком", style = MaterialTheme.typography.titleSmall)
+                            Text(when {
+                                sync.error != null -> "Ошибка: " + sync.error
+                                sync.checking -> "Проверка соединения…"
+                                sync.pending > 0 -> "Ожидают отправки: " + sync.pending
+                                sync.lastServerRead != null -> "Сервер подтвердил чтение"
+                                else -> "Синхронизация ещё не подтверждена"
+                            })
+                            sync.lastServerRead?.let {
+                                Text("Последнее чтение: " + java.text.DateFormat.getDateTimeInstance().format(java.util.Date(it)), style = MaterialTheme.typography.bodySmall)
+                            }
+                            sync.lastWriteAck?.let {
+                                Text("Последняя подтверждённая запись: " + java.text.DateFormat.getDateTimeInstance().format(java.util.Date(it)), style = MaterialTheme.typography.bodySmall)
+                            }
+                            Text("В очереди: " + sync.pending, style = MaterialTheme.typography.bodySmall)
+                            OutlinedButton(onClick = { app.authManager.currentUser?.uid?.let { app.syncManager.start(it) } }) {
+                                Text("Повторить синхронизацию")
+                            }
+                        }
                     }
                     OutlinedButton(
                         onClick = { app.authManager.signOut() },

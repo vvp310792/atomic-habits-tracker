@@ -19,5 +19,8 @@ class PausePeriodRepository(
         }
     }
 
-    suspend fun delete(period: PausePeriod) = dao.delete(period)
+    suspend fun delete(period: PausePeriod) {
+        dao.delete(period)
+        currentUid()?.let { syncManager?.deletePausePeriod(it, period.syncId) }
+    }
 }

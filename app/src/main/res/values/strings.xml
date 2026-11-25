@@ -9,7 +9,8 @@
     <string name="home_week_progress">Дни, завершённые на этой неделе: %1$d/%2$d</string>
     <string name="home_section_done">\u2705 Сделал</string>
     <string name="home_section_held">\uD83D\uDEE1 Устоял</string>
-    <string name="home_held_clean_today">Сегодня чисто</string>
+    <string name="home_held_clean_today">Сегодня без срыва (отмечено)</string>
+    <string name="home_held_unknown_today">Сегодня нет записи</string>
     <string name="home_held_slip_today">Был срыв сегодня</string>
     <string name="habits_title">Ваши привычки</string>
     <string name="habits_section_tracked">Создаваемые привычки</string>
@@ -33,9 +34,9 @@
     <string name="history_stat_habits_fraction">Привычки: %1$d/%2$d</string>
     <string name="history_stat_perfect_days">Идеальные дни</string>
     <string name="history_statistics_title">Статистика</string>
-    <string name="history_impulse_chart_title">Преодолённые позывы</string>
+    <string name="history_impulse_chart_title">Записи дневника</string>
     <string name="history_impulse_chart_subtitle">Удержано: %1$d · Поддался: %2$d</string>
-    <string name="history_impulse_chart_empty">Пока нет отметок на экране «Позыв»</string>
+    <string name="history_impulse_chart_empty">Пока нет заполненных записей дневника</string>
     <string name="history_impulse_chart_no_habits">Нет отслеживаемых вредных привычек</string>
     <string name="history_impulse_legend_check">Удержался</string>
     <string name="history_impulse_legend_cross">Поддался</string>

@@ -33,33 +33,12 @@ class HabitJournalRepository(
  * is the sole source of truth, not whether [HabitJournalEntry.amount] happens
  * to be blank (typing "0" into Amount is a non-blank string, so inferring
  * from blankness silently miscounted every honestly-filled-in day as a slip -
- * see the class doc). Days with no entry are skipped (neither extend nor
- * break the count), same live-and-let-live treatment as non-scheduled days
- * get elsewhere in this app, since missing a diary entry isn't the same claim
- * as an explicit "nothing happened today".
+ * see the class doc). A missing day breaks a confirmed consecutive series; it is unknown, not a slip.
  */
 fun computeJournalDaysWithout(
     habitSyncId: String,
     habitCreatedAtEpochDay: Long,
     entries: List<HabitJournalEntry>
 ): DaysWithoutInfo {
-    val today = LocalDate.now().toEpochDay()
-    val relevant = entries.filter { it.habitSyncId == habitSyncId }
-    val slipDays = relevant.filter { it.hadSlip }.map { it.dateEpochDay }.distinct().sorted()
-    val start = if (habitCreatedAtEpochDay > 0) habitCreatedAtEpochDay else (relevant.minOfOrNull { it.dateEpochDay } ?: today)
-
-    if (slipDays.isEmpty()) {
-        val days = (today - start).toInt().coerceAtLeast(0)
-        return DaysWithoutInfo(currentDays = days, bestDays = days)
-    }
-
-    val currentDays = (today - slipDays.last()).toInt().coerceAtLeast(0)
-    var best = (slipDays.first() - start).toInt().coerceAtLeast(0)
-    for (i in 1 until slipDays.size) {
-        val gap = (slipDays[i] - slipDays[i - 1]).toInt()
-        if (gap > best) best = gap
-    }
-    if (currentDays > best) best = currentDays
-
-    return DaysWithoutInfo(currentDays = currentDays, bestDays = best)
+    return HabitMetrics.diaryStreak(habitSyncId, habitCreatedAtEpochDay, entries, LocalDate.now().toEpochDay())
 }

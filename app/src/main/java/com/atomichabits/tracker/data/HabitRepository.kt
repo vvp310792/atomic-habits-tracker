@@ -2,6 +2,8 @@ package com.atomichabits.tracker.data
 
 import com.atomichabits.tracker.sync.FirestoreSyncManager
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
@@ -12,6 +14,8 @@ class HabitRepository(
     private val syncManager: FirestoreSyncManager? = null,
     private val currentUid: () -> String? = { null }
 ) {
+    private val toggleLock = Mutex()
+
     fun observeActiveHabits(): Flow<List<Habit>> = habitDao.observeActiveHabits()
 
     fun observeHabit(habitId: Long): Flow<Habit?> = habitDao.observeHabit(habitId)
@@ -95,10 +99,10 @@ class HabitRepository(
     }
 
     /** Toggles completion for [habitId] on [date]. Returns the new completed state. */
-    suspend fun toggleCompletion(habitId: Long, date: LocalDate): Boolean {
+    suspend fun toggleCompletion(habitId: Long, date: LocalDate): Boolean = toggleLock.withLock {
         val epochDay = date.toEpochDay()
         val existing = habitLogDao.getForDate(habitId, epochDay)
-        return if (existing != null) {
+        if (existing != null) {
             habitLogDao.deleteForDate(habitId, epochDay)
             val uid = currentUid()
             if (uid != null && syncManager != null) {
@@ -139,26 +143,17 @@ class HabitRepository(
 
         val current = computeCurrentStreak(habit, completedDays, pausePeriods)
 
-        var best = 0
-        var running = 0
-        val sortedDays = completedDays.sorted()
-        for (i in sortedDays.indices) {
-            if (i == 0 || sortedDays[i] == sortedDays[i - 1] + 1) {
-                running++
-            } else {
-                running = 1
-            }
-            if (running > best) best = running
-        }
-
-        val since = LocalDate.now().minusDays(29)
+        val best = HabitMetrics.bestStreak(habit, completedDays, pausePeriods, LocalDate.now())
+        // Last 30 closed days, not the unfinished current day or days before creation.
+        val through = LocalDate.now().minusDays(1)
+        var day = through.minusDays(29)
         var scheduled = 0
         var done = 0
-        var day = since
-        while (!day.isAfter(LocalDate.now())) {
-            if (isActiveOn(habit, day, pausePeriods)) {
+        while (!day.isAfter(through)) {
+            val hit = day.toEpochDay() in completedDays
+            if (HabitMetrics.due(habit, day, pausePeriods, hit)) {
                 scheduled++
-                if (completedDays.contains(day.toEpochDay())) done++
+                if (hit) done++
             }
             day = day.plusDays(1)
         }
@@ -245,23 +240,7 @@ class HabitRepository(
         pausePeriods: List<PausePeriod> = emptyList(),
         maxIterations: Int = 3660
     ): Int {
-        var current = 0
-        var cursor = LocalDate.now()
-        var guard = 0
-        while (guard < maxIterations) {
-            guard++
-            if (!isActiveOn(habit, cursor, pausePeriods)) {
-                cursor = cursor.minusDays(1)
-                continue
-            }
-            if (completedEpochDays.contains(cursor.toEpochDay())) {
-                current++
-                cursor = cursor.minusDays(1)
-            } else {
-                break
-            }
-        }
-        return current
+        return HabitMetrics.currentStreak(habit, completedEpochDays, pausePeriods, LocalDate.now(), maxIterations)
     }
 
     fun computeMastery(
@@ -301,9 +280,10 @@ class HabitRepository(
         var done = 0
         var day = since
         while (!day.isAfter(today)) {
-            if (isActiveOn(habit, day, pausePeriods)) {
+            val hit = day.toEpochDay() in completedEpochDays
+            if (HabitMetrics.due(habit, day, pausePeriods, hit)) {
                 scheduled++
-                if (completedEpochDays.contains(day.toEpochDay())) done++
+                if (hit) done++
             }
             day = day.plusDays(1)
         }

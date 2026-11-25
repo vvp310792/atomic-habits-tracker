@@ -64,6 +64,7 @@ import com.atomichabits.tracker.data.Habit
 import com.atomichabits.tracker.data.HabitJournalEntry
 import com.atomichabits.tracker.data.HabitLog
 import com.atomichabits.tracker.data.MasteryInfo
+import com.atomichabits.tracker.data.HabitMetrics
 import com.atomichabits.tracker.data.PausePeriod
 import com.atomichabits.tracker.util.isHabitScheduledOn
 import java.time.LocalDate
@@ -74,17 +75,18 @@ import java.time.temporal.ChronoUnit
 @Composable
 fun HistoryScreen(app: HabitTrackerApp, onOpenHabit: (Long) -> Unit) {
     val habits by app.repository.observeActiveHabits().collectAsState(initial = emptyList())
-    val trackedHabits = remember(habits) { habits.filter { it.isTracked } }
+    val trackedHabits = remember(habits) { habits.filter { it.isTracked && it.qualityType != "HARMFUL" } }
     val trackedHarmfulHabits = remember(habits) { habits.filter { it.isTracked && it.qualityType == "HARMFUL" } }
     val allLogs by app.repository.observeAllLogs().collectAsState(initial = emptyList())
     val journalEntries by app.journalRepository.observeAll().collectAsState(initial = emptyList())
     val pausePeriods by app.pausePeriodRepository.observeAll().collectAsState(initial = emptyList())
     val today = remember { LocalDate.now() }
+    val sync by app.syncManager.status.collectAsState()
 
     var tabIndex by remember { mutableIntStateOf(0) }
     var visibleMonth by remember { mutableStateOf(YearMonth.from(today)) }
 
-    val stats = remember(trackedHabits, allLogs) { computeHistoryStats(trackedHabits, allLogs, today) }
+    val stats = remember(trackedHabits, allLogs, pausePeriods, today) { computeHistoryStats(trackedHabits, allLogs, today, pausePeriods) }
     // "Сводная динамика по статистике освоения" - % of tracked habits mastered,
     // recomputed at several PAST reference dates (not just today) via
     // HabitRepository.computeMastery's asOf parameter, so this reads as an
@@ -108,12 +110,14 @@ fun HistoryScreen(app: HabitTrackerApp, onOpenHabit: (Long) -> Unit) {
         Box(modifier = Modifier.padding(padding)) {
             when (tabIndex) {
                 0 -> CalendarTab(
+                    sync = sync,
                     habits = trackedHabits,
                     allLogs = allLogs,
                     journalEntries = journalEntries,
                     harmfulHabits = trackedHarmfulHabits,
                     stats = stats,
                     masteryTrend = masteryTrend,
+                    pausePeriods = pausePeriods,
                     today = today,
                     visibleMonth = visibleMonth,
                     onMonthChange = { visibleMonth = it }
@@ -139,14 +143,15 @@ private data class HistoryStats(
     val completionsThisWeek: Int
 )
 
-private fun computeHistoryStats(habits: List<Habit>, allLogs: List<HabitLog>, today: LocalDate): HistoryStats {
+private fun computeHistoryStats(habits: List<Habit>, allLogs: List<HabitLog>, today: LocalDate, pausePeriods: List<PausePeriod>): HistoryStats {
     val completedByDate = allLogs.filter { it.completed }.groupBy { it.dateEpochDay }
     val earliestFromHabits = habits.minOfOrNull { it.createdAtEpochDay }
     val earliestFromLogs = allLogs.minOfOrNull { it.dateEpochDay }
     val earliestEpoch = listOfNotNull(earliestFromHabits, earliestFromLogs).minOrNull() ?: today.toEpochDay()
     val earliestDate = LocalDate.ofEpochDay(earliestEpoch)
-    val allDates = if (earliestDate.isAfter(today)) emptyList() else
-        (0..ChronoUnit.DAYS.between(earliestDate, today)).map { earliestDate.plusDays(it) }
+    val through = today.minusDays(1)
+    val allDates = if (earliestDate.isAfter(through)) emptyList() else
+        (0..ChronoUnit.DAYS.between(earliestDate, through)).map { earliestDate.plusDays(it) }
 
     var totalScheduled = 0
     var totalCompleted = 0
@@ -155,13 +160,12 @@ private fun computeHistoryStats(habits: List<Habit>, allLogs: List<HabitLog>, to
     var perfectDaysThisWeek = 0
 
     for (date in allDates) {
-        val scheduledHabits = habits.filter { isHabitScheduledOn(it.activeDays, date) && it.createdAtEpochDay <= date.toEpochDay() }
-        if (scheduledHabits.isEmpty()) continue
-        val completedIds = completedByDate[date.toEpochDay()]?.map { it.habitId }?.toSet() ?: emptySet()
-        val completedCount = scheduledHabits.count { it.id in completedIds }
-        totalScheduled += scheduledHabits.size
-        totalCompleted += completedCount
-        val isPerfect = completedCount >= scheduledHabits.size
+        val completedIds = completedByDate[date.toEpochDay()]?.map { it.habitId }?.toSet().orEmpty()
+        val p = HabitMetrics.day(habits, date, completedIds, pausePeriods)
+        if (p.scheduled == 0) continue
+        totalScheduled += p.scheduled
+        totalCompleted += p.completed
+        val isPerfect = p.perfect
         if (isPerfect) perfectDaysAllTime++
         if (isPerfect && !date.isBefore(weekMonday) && !date.isAfter(today)) perfectDaysThisWeek++
     }
@@ -171,30 +175,8 @@ private fun computeHistoryStats(habits: List<Habit>, allLogs: List<HabitLog>, to
     val logsByHabit = allLogs.filter { it.completed }.groupBy { it.habitId }
     for (habit in habits) {
         val completedDays = logsByHabit[habit.id]?.map { it.dateEpochDay }?.toSet() ?: emptySet()
-        var current = 0
-        var cursor = today
-        var guard = 0
-        while (guard < 3660) {
-            guard++
-            if (!isHabitScheduledOn(habit.activeDays, cursor)) {
-                cursor = cursor.minusDays(1)
-                continue
-            }
-            if (completedDays.contains(cursor.toEpochDay())) {
-                current++
-                cursor = cursor.minusDays(1)
-            } else break
-        }
-        if (current > bestCurrentStreak) bestCurrentStreak = current
-
-        var best = 0
-        var running = 0
-        val sorted = completedDays.sorted()
-        for (i in sorted.indices) {
-            running = if (i == 0 || sorted[i] == sorted[i - 1] + 1) running + 1 else 1
-            if (running > best) best = running
-        }
-        if (best > bestStreakEver) bestStreakEver = best
+        bestCurrentStreak = maxOf(bestCurrentStreak, HabitMetrics.currentStreak(habit, completedDays, pausePeriods, today))
+        bestStreakEver = maxOf(bestStreakEver, HabitMetrics.bestStreak(habit, completedDays, pausePeriods, today))
     }
 
     val totalCompletionsEver = allLogs.count { it.completed }
@@ -222,17 +204,32 @@ private fun computeHistoryStats(habits: List<Habit>, allLogs: List<HabitLog>, to
 
 @Composable
 private fun CalendarTab(
+    sync: com.atomichabits.tracker.sync.SyncStatus,
     habits: List<Habit>,
     allLogs: List<HabitLog>,
     journalEntries: List<HabitJournalEntry>,
     harmfulHabits: List<Habit>,
     stats: HistoryStats,
     masteryTrend: List<MasteryTrendPoint>,
+    pausePeriods: List<PausePeriod>,
     today: LocalDate,
     visibleMonth: YearMonth,
     onMonthChange: (YearMonth) -> Unit
 ) {
     LazyColumn(contentPadding = PaddingValues(16.dp)) {
+        item {
+            Text(
+                if (!sync.signedIn || sync.checking || sync.error != null || sync.pending > 0)
+                    "Локальные данные · синхронизация не подтверждена"
+                else "Локальные данные · последнее подтверждение сервера: " +
+                    (sync.lastServerRead?.let { java.text.DateFormat.getDateTimeInstance().format(java.util.Date(it)) } ?: "нет"),
+                style = MaterialTheme.typography.labelMedium
+            )
+            val last = allLogs.filter { it.completed }.maxOfOrNull { it.dateEpochDay }
+            Text("Последняя отметка: " + (last?.let { LocalDate.ofEpochDay(it).toString() } ?: "нет данных"),
+                style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.size(8.dp))
+        }
         item {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 16.dp)) {
                 item {
@@ -254,7 +251,7 @@ private fun CalendarTab(
                 item {
                     StatCard(
                         title = stringResource(R.string.history_stat_completion_rate),
-                        value = "${stats.completionPercent}%",
+                        value = if (stats.totalScheduled == 0) "—" else "${stats.completionPercent}%",
                         subtitle = stringResource(R.string.history_stat_habits_fraction, stats.totalCompleted, stats.totalScheduled),
                         color = Color(0xFFF2A93B)
                     )
@@ -281,6 +278,7 @@ private fun CalendarTab(
         }
 
         item {
+            Text("История по текущему расписанию · завершённые дни", style = MaterialTheme.typography.labelSmall)
             ImpulseTrendChart(habits = harmfulHabits, entries = journalEntries, today = today)
             Spacer(Modifier.size(20.dp))
         }
@@ -295,7 +293,7 @@ private fun CalendarTab(
             Spacer(Modifier.size(10.dp))
         }
 
-        items(weeklyBuckets(habits, allLogs, today)) { week ->
+        items(weeklyBuckets(habits, allLogs, today, pausePeriods)) { week ->
             WeekStatCard(week)
             Spacer(Modifier.size(10.dp))
         }
@@ -687,7 +685,7 @@ private fun MasteryTrendChart(trend: List<MasteryTrendPoint>) {
 
 private data class WeekBucket(val start: LocalDate, val end: LocalDate, val percent: Int, val dailyPercent: List<Int>)
 
-private fun weeklyBuckets(habits: List<Habit>, allLogs: List<HabitLog>, today: LocalDate, maxWeeks: Int = 12): List<WeekBucket> {
+private fun weeklyBuckets(habits: List<Habit>, allLogs: List<HabitLog>, today: LocalDate, pausePeriods: List<PausePeriod>, maxWeeks: Int = 12): List<WeekBucket> {
     val completedByDate = allLogs.filter { it.completed }.groupBy { it.dateEpochDay }
     val thisMonday = today.minusDays((today.dayOfWeek.value - 1).toLong())
     val result = mutableListOf<WeekBucket>()
@@ -696,11 +694,11 @@ private fun weeklyBuckets(habits: List<Habit>, allLogs: List<HabitLog>, today: L
         val end = start.plusDays(6)
         val dailyPercent = (0..6).map { offset ->
             val date = start.plusDays(offset.toLong())
-            if (date.isAfter(today)) return@map -1
-            val scheduled = habits.count { isHabitScheduledOn(it.activeDays, date) && it.createdAtEpochDay <= date.toEpochDay() }
-            if (scheduled == 0) return@map -1
-            val completed = (completedByDate[date.toEpochDay()]?.size ?: 0).coerceAtMost(scheduled)
-            (completed * 100 / scheduled)
+            if (!date.isBefore(today)) return@map -1
+            val ids = completedByDate[date.toEpochDay()]?.map { it.habitId }?.toSet().orEmpty()
+            val p = HabitMetrics.day(habits, date, ids, pausePeriods)
+            if (p.scheduled == 0) return@map -1
+            p.completed * 100 / p.scheduled
         }
         val validDays = dailyPercent.filter { it >= 0 }
         if (validDays.isEmpty()) continue
