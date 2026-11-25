@@ -41,6 +41,8 @@ import com.atomichabits.tracker.data.Habit
 import com.atomichabits.tracker.data.computeJournalDaysWithout
 import com.atomichabits.tracker.notifications.NotificationHelper
 import com.atomichabits.tracker.ui.components.CrossGroupDraggableSections
+import com.atomichabits.tracker.data.HabitMetrics
+import com.atomichabits.tracker.data.isHabitPausedOn
 import com.atomichabits.tracker.ui.components.DateProgressRing
 import com.atomichabits.tracker.ui.components.DragGroup
 import com.atomichabits.tracker.ui.components.HabitCard
@@ -87,18 +89,16 @@ fun HomeScreen(
     var selectedDate by remember { mutableStateOf(today) }
     var filter by remember { mutableStateOf("ALL") }
 
-    val progressByDate = remember(trackedHabits, windowLogs) {
+    val progressByDate = remember(trackedHabits, windowLogs, pausePeriods, days) {
         days.associateWith { date ->
-            val scheduledIds = trackedHabits.filter { isHabitScheduledOn(it.activeDays, date) }.map { it.id }.toSet()
-            val completedCount = windowLogs.count {
-                it.dateEpochDay == date.toEpochDay() && it.completed && it.habitId in scheduledIds
-            }
-            completedCount to scheduledIds.size
+            val ids = windowLogs.filter { it.dateEpochDay == date.toEpochDay() && it.completed }.map { it.habitId }.toSet()
+            val p = HabitMetrics.day(trackedHabits, date, ids, pausePeriods)
+            p.completed to p.scheduled
         }
     }
 
     val habitsForSelectedDate = remember(trackedHabits, selectedDate) {
-        trackedHabits.filter { isHabitScheduledOn(it.activeDays, selectedDate) }
+        trackedHabits.filter { HabitMetrics.planned(it, selectedDate) }
     }
     val completedIdsForSelectedDate = remember(windowLogs, selectedDate) {
         windowLogs.filter { it.dateEpochDay == selectedDate.toEpochDay() && it.completed }
@@ -131,14 +131,14 @@ fun HomeScreen(
     val weekDaysElapsed = remember(today, weekMonday) {
         (0..ChronoUnit.DAYS.between(weekMonday, today)).map { weekMonday.plusDays(it) }
     }
-    val perfectDaysThisWeek = remember(trackedHabits, windowLogs, weekDaysElapsed) {
-        weekDaysElapsed.count { date ->
-            val scheduled = trackedHabits.filter { isHabitScheduledOn(it.activeDays, date) }.map { it.id }.toSet()
-            if (scheduled.isEmpty()) return@count false
+    val weekProgress = remember(trackedHabits, windowLogs, weekDaysElapsed, pausePeriods) {
+        weekDaysElapsed.map { date ->
             val completed = windowLogs.filter { it.dateEpochDay == date.toEpochDay() && it.completed }.map { it.habitId }.toSet()
-            scheduled.all { it in completed }
+            HabitMetrics.day(trackedHabits, date, completed, pausePeriods)
         }
     }
+    val perfectDaysThisWeek = weekProgress.count { it.perfect }
+    val plannedDaysThisWeek = weekProgress.count { it.scheduled > 0 }
 
     fun habitToggle(habit: Habit): () -> Unit = {
         app.launchPersistent {
@@ -254,7 +254,10 @@ fun HomeScreen(
                     val indexInGroup = groupHabits.indexOfFirst { it.id == habit.id }
                     Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.weight(1f)) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                if (isHabitPausedOn(habit.syncId, selectedDate, pausePeriods)) {
+                                    Text("Пауза · выполнение по желанию", style = MaterialTheme.typography.labelSmall)
+                                }
                                 HabitCard(
                                     habit = habit,
                                     completedToday = habit.id in completedIdsForSelectedDate,
@@ -310,7 +313,7 @@ fun HomeScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
                     Text(
-                        stringResource(R.string.home_week_progress, perfectDaysThisWeek, weekDaysElapsed.size),
+                        stringResource(R.string.home_week_progress, perfectDaysThisWeek, plannedDaysThisWeek),
                         style = MaterialTheme.typography.labelLarge,
                         modifier = Modifier.padding(14.dp)
                     )
@@ -331,11 +334,8 @@ fun HomeScreen(
                         computeJournalDaysWithout(habit.syncId, habit.createdAtEpochDay, journalEntries)
                     }
                     val hadSlipToday = remember(habit, journalEntries, today) {
-                        journalEntries.any {
-                            it.habitSyncId == habit.syncId &&
-                                it.dateEpochDay == today.toEpochDay() &&
-                                it.amount.isNotBlank()
-                        }
+                        journalEntries.filter { it.habitSyncId == habit.syncId && it.dateEpochDay == today.toEpochDay() }
+                            .let { if (it.isEmpty()) null else it.any { entry -> entry.hadSlip } }
                     }
                     Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
                         HeldTodayCard(
@@ -352,7 +352,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HeldTodayCard(habit: Habit, hadSlipToday: Boolean, daysWithout: Int, onClick: () -> Unit) {
+private fun HeldTodayCard(habit: Habit, hadSlipToday: Boolean?, daysWithout: Int, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -369,8 +369,11 @@ private fun HeldTodayCard(habit: Habit, hadSlipToday: Boolean, daysWithout: Int,
             Column {
                 Text("${habit.emoji} ${habit.name}", style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    if (hadSlipToday) stringResource(R.string.home_held_slip_today)
-                    else stringResource(R.string.home_held_clean_today),
+                    when (hadSlipToday) {
+                        true -> stringResource(R.string.home_held_slip_today)
+                        false -> stringResource(R.string.home_held_clean_today)
+                        null -> stringResource(R.string.home_held_unknown_today)
+                    },
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
                 )

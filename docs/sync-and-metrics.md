@@ -1,0 +1,8 @@
+# Sync and statistics repair
+
+- Outbox: per-account persistent operations, coalescing by document ID, acknowledged only when Firestore reports success; retry every 30 seconds while the application is running. No background execution guarantee when Android terminates the process. Room and preferences are separate stores (a process death between local commit and enqueue is not atomic).
+- First upgrade: private pre-merge JSON backup; transactional create-only recovery of missing definitions and missing records after the last cloud date (or for new habits). Ambiguous older gaps and conflicting definitions are preserved in the backup, not automatically overwritten. A persisted recovery plan survives interrupted batches. Existing cloud documents are not overwritten by recovery.
+- Listeners consume authoritative snapshots serially, defer child records until their parent is present, ignore cached/pending snapshots, and recognize confirmed removals. Account change is blocked rather than mixing a single-account Room database.
+- Technical event and device status collections: syncEvents and syncStatus. Error class/code only, pending count, build, timestamps. Crash class/time delivered after restart if possible. No habit or diary text.
+- History excludes harmful habits, unfinished today, pre-creation days and missed paused opportunities; paused completions count if scheduled. Current schedules approximate past schedules. Missing diary days are unknown, not clean.
+- Existing Room schema and Firestore rules are unchanged. Verify on real phone with a local export before and after recovery, compare document counts and latest dates, and check syncStatus. No UI or offline/online integration verification is implied by JVM unit tests.

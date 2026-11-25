@@ -34,7 +34,7 @@ jobs:
           gradle-version: 8.14.3
 
       - name: Build debug APK
-        run: gradle assembleDebug --stacktrace -PappVersionCode=${{ github.run_number }}
+        run: gradle testDebugUnitTest assembleDebug --stacktrace -PappVersionCode=${{ github.run_number }}
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

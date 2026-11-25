@@ -13,6 +13,11 @@ import com.atomichabits.tracker.sync.FirestoreSyncManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 class HabitTrackerApp : Application() {
 
@@ -28,7 +33,7 @@ class HabitTrackerApp : Application() {
             database.habitLogDao(),
             pausePeriodDao = database.pausePeriodDao(),
             syncManager = syncManager,
-            currentUid = { authManager.currentUser?.uid }
+            currentUid = { authManager.currentUser?.uid ?: syncManager.localOwnerUid }
         )
     }
 
@@ -36,7 +41,7 @@ class HabitTrackerApp : Application() {
         PausePeriodRepository(
             database.pausePeriodDao(),
             syncManager = syncManager,
-            currentUid = { authManager.currentUser?.uid }
+            currentUid = { authManager.currentUser?.uid ?: syncManager.localOwnerUid }
         )
     }
 
@@ -44,7 +49,7 @@ class HabitTrackerApp : Application() {
         ImpulseRepository(
             database.impulseLogDao(),
             syncManager = syncManager,
-            currentUid = { authManager.currentUser?.uid }
+            currentUid = { authManager.currentUser?.uid ?: syncManager.localOwnerUid }
         )
     }
 
@@ -52,7 +57,7 @@ class HabitTrackerApp : Application() {
         HabitJournalRepository(
             database.habitJournalEntryDao(),
             syncManager = syncManager,
-            currentUid = { authManager.currentUser?.uid }
+            currentUid = { authManager.currentUser?.uid ?: syncManager.localOwnerUid }
         )
     }
 
@@ -60,11 +65,11 @@ class HabitTrackerApp : Application() {
         IdentityRepository(
             database.identityDao(),
             syncManager = syncManager,
-            currentUid = { authManager.currentUser?.uid }
+            currentUid = { authManager.currentUser?.uid ?: syncManager.localOwnerUid }
         )
     }
 
-    private val appScope = CoroutineScope(Dispatchers.IO)
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * Launches persistence work (saves, reorders, moves) on an application-scoped
@@ -79,28 +84,30 @@ class HabitTrackerApp : Application() {
         appScope.launch { block() }
     }
 
-    /** True once we've done the one-time "push everything local" for the current sign-in. */
-    private var didInitialPush = false
-
     override fun onCreate() {
         super.onCreate()
         NotificationHelper.ensureChannel(this)
+        // Preserve only a technical crash class and time for delivery after restart.
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            runCatching {
+                getSharedPreferences("sync_state_v2", MODE_PRIVATE).edit()
+                    .putString("crash_type", error.javaClass.simpleName)
+                    .putLong("crash_time", System.currentTimeMillis()).commit()
+            }
+            previousHandler?.uncaughtException(thread, error)
+                ?: android.os.Process.killProcess(android.os.Process.myPid())
+        }
 
         appScope.launch {
-            authManager.authStateFlow().collect { user ->
-                if (user != null) {
-                    syncManager.start(user.uid)
-                    if (!didInitialPush) {
-                        didInitialPush = true
-                        // Pushes any habits/logs that existed locally before this
-                        // sign-in (e.g. the user tried the app before signing in).
-                        // Harmless/idempotent if there's nothing local yet.
-                        syncManager.pushAll(user.uid)
-                    }
-                } else {
-                    syncManager.stop()
-                    didInitialPush = false
-                }
+            authManager.authStateFlow().map { it?.uid }.distinctUntilChanged().collect { uid ->
+                if (uid != null) syncManager.start(uid) else syncManager.stop()
+            }
+        }
+        appScope.launch {
+            while (isActive) {
+                delay(30_000)
+                syncManager.retryPending()
             }
         }
     }
